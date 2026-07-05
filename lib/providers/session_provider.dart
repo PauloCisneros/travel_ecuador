@@ -22,8 +22,8 @@ class SessionProvider extends ChangeNotifier {
     await _authService.signIn(email: email, password: password);
   }
 
-  Future<void> register(String email, String password) async {
-    await _authService.signUp(email: email, password: password);
+  Future<void> register(String email, String password, String nombre) async {
+    await _authService.signUp(email: email, password: password, nombre: nombre);
   }
 
   Future<void> logout() async {

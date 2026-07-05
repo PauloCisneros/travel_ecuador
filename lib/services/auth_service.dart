@@ -6,11 +6,23 @@ class AuthService {
   Future<void> signUp({
     required String email,
     required String password,
+    required String nombre,
   }) async {
-    await _client.auth.signUp(
+    final response = await _client.auth.signUp(
       email: email,
       password: password,
     );
+
+    final userId = response.user?.id;
+    if (userId == null) {
+      throw Exception('No se pudo obtener el usuario creado en Supabase.');
+    }
+
+    await _client.from('users').upsert({
+      'uid': userId,
+      'nombre': nombre,
+      'email': email,
+    });
   }
 
   Future<void> signIn({

@@ -10,6 +10,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final formKey = GlobalKey<FormState>();
@@ -33,10 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
           const SnackBar(content: Text('Login correcto')),
         );
       } else {
-        await session.register(emailController.text.trim(), passwordController.text);
+        await session.register(
+          emailController.text.trim(),
+          passwordController.text,
+          nameController.text.trim(),
+        );
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro creado. Revisa tu correo si Supabase pidió confirmación.')),
+          const SnackBar(content: Text('Registro creado y perfil guardado en users. Revisa tu correo si Supabase pidió confirmación.')),
         );
       }
     } catch (e) {
@@ -51,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -75,6 +81,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 24),
+                  if (!isLogin) ...[
+                    TextFormField(
+                      controller: nameController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(labelText: 'Nombre'),
+                      validator: (value) {
+                        if (!isLogin && (value == null || value.trim().isEmpty)) {
+                          return 'Ingresa tu nombre';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   TextFormField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
