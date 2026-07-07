@@ -11,6 +11,22 @@ dependencies:
     sdk: flutter
   provider: ^6.1.2
   supabase_flutter: ^2.15.4
+  file_picker: ^8.0.0
+
+  # GPS
+  geolocator: ^10.1.0
+
+  # HTTP para llamadas API
+  http: ^1.1.0
+
+  # Selección de imágenes
+  image_picker: ^1.1.2
+
+  # Para manejo de rutas
+  path: ^1.9.0
+
+  google_maps_flutter: ^2.5.0
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

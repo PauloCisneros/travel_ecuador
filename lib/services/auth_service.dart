@@ -1,12 +1,19 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:math';
 
 class AuthService {
   final SupabaseClient _client = Supabase.instance.client;
 
+  // Generar nombre aleatorio (número)
+  String _generateRandomName() {
+    final random = Random();
+    // Generar un número aleatorio de 8 dígitos
+    return random.nextInt(90000000).toString().padLeft(8, '0');
+  }
+
   Future<void> signUp({
     required String email,
     required String password,
-    required String nombre,
   }) async {
     final response = await _client.auth.signUp(
       email: email,
@@ -18,11 +25,67 @@ class AuthService {
       throw Exception('No se pudo obtener el usuario creado en Supabase.');
     }
 
-    await _client.from('users').upsert({
+    // Generar nombre aleatorio
+    final randomName = _generateRandomName();
+
+    // Guardar el usuario en la tabla users con nombre aleatorio
+    await _client.from('users').insert({
       'uid': userId,
-      'nombre': nombre,
+      'nombre': randomName,
       'email': email,
     });
+  }
+
+  // Método para obtener el perfil del usuario actual
+  Future<Map<String, dynamic>?> getCurrentUserProfile() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return null;
+
+    final response = await _client
+        .from('users')
+        .select()
+        .eq('uid', user.id)
+        .maybeSingle();
+
+    return response;
+  }
+
+  // Método para actualizar el perfil del usuario
+  Future<void> updateUserProfile({
+    required String nombre,
+    String? email,
+  }) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw Exception('Usuario no autenticado');
+
+    await _client.from('users').update({
+      'nombre': nombre,
+      if (email != null) 'email': email,
+    }).eq('uid', user.id);
+  }
+
+  // Método para sincronizar el usuario autenticado con la tabla users
+  // Útil para cuando el usuario ya existe en auth pero no en la tabla users
+  Future<void> syncUserProfile() async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+
+    // Verificar si el usuario existe en la tabla users
+    final existingUser = await _client
+        .from('users')
+        .select()
+        .eq('uid', user.id)
+        .maybeSingle();
+
+    // Si no existe, crearlo con nombre aleatorio
+    if (existingUser == null) {
+      final randomName = _generateRandomName();
+      await _client.from('users').insert({
+        'uid': user.id,
+        'nombre': randomName,
+        'email': user.email,
+      });
+    }
   }
 
   Future<void> signIn({
