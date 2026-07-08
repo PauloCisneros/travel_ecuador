@@ -38,6 +38,7 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
   String? _clima;
   double? _temperatura;
   int? _humedad;
+  String _loadingMessage = 'Preparando...';
 
   bool get _hasImage => _imagenFile != null || _imagenBytes != null || (_imagenUrlExistente != null && _imagenUrlExistente!.isNotEmpty);
 
@@ -69,13 +70,21 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
   }
 
   Future<void> _obtenerUbicacionYClima() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'Solicitando ubicación...';
+    });
 
     try {
       final gpsService = GpsService();
       final position = await gpsService.getCurrentLocation();
       _latitud = position.latitude;
       _longitud = position.longitude;
+
+      if (!mounted) return;
+      setState(() {
+        _loadingMessage = 'Consultando clima...';
+      });
 
       final weatherService = WeatherService();
       final weatherData = await weatherService.getWeather(_latitud!, _longitud!);
@@ -84,7 +93,12 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       _humedad = weatherData['humedad'];
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = 'Preparando...';
+        });
+      }
         const SnackBar(content: Text('Ubicación y clima obtenidos correctamente')),
       );
     } catch (e) {
@@ -298,7 +312,35 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      _loadingMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Si tarda mucho, revisa el GPS, los permisos y la conexión a internet.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Form(
@@ -309,7 +351,11 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
                     ElevatedButton.icon(
                       onPressed: _obtenerUbicacionYClima,
                       icon: const Icon(Icons.gps_fixed),
-                      label: Text(_isEditing ? 'Actualizar ubicación y clima' : 'Obtener ubicación y clima'),
+                      label: Text(
+                        _isEditing
+                            ? 'Actualizar ubicación y clima'
+                            : 'Obtener ubicación y clima',
+                      ),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),

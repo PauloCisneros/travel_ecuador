@@ -20,9 +20,23 @@ class GpsService {
         throw Exception('Los permisos de ubicación están permanentemente denegados.');
       }
 
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      try {
+        return await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            throw Exception('No se pudo obtener la ubicación a tiempo. Revisa el GPS del dispositivo y vuelve a intentar.');
+          },
+        );
+      } catch (_) {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          return lastKnown;
+        }
+
+        rethrow;
+      }
     } catch (e) {
       throw Exception('Error al obtener la ubicación: $e');
     }

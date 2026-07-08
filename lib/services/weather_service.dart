@@ -11,7 +11,12 @@ class WeatherService {
         '$baseUrl?lat=$lat&lon=$lon&appid=$apiKey&units=metric&lang=es',
       );
 
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          throw Exception('La consulta del clima tardó demasiado.');
+        },
+      );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
