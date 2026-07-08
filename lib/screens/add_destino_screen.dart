@@ -93,12 +93,7 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       _humedad = weatherData['humedad'];
 
       if (!mounted) return;
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _loadingMessage = 'Preparando...';
-        });
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ubicación y clima obtenidos correctamente')),
       );
     } catch (e) {
@@ -107,7 +102,12 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
         SnackBar(content: Text('Error: $e')),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = 'Preparando...';
+        });
+      }
     }
   }
 
