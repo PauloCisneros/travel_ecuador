@@ -32,29 +32,29 @@ class DestinoCard extends StatelessWidget {
       },
       child: Card(
         margin: const EdgeInsets.only(bottom: 16),
-        elevation: 4,
+        elevation: 0,
+        color: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: Colors.grey.shade200),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Imagen con corazón
             Stack(
               children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
+                AspectRatio(
+                  aspectRatio: 16 / 10,
                   child: Image.network(
                     destino.imagenUrl,
-                    height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
                       return Container(
-                        height: 200,
+                        width: double.infinity,
                         color: Colors.grey.shade200,
                         child: const Center(
                           child: CircularProgressIndicator(),
@@ -63,12 +63,12 @@ class DestinoCard extends StatelessWidget {
                     },
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
-                        height: 200,
+                        width: double.infinity,
                         color: Colors.grey.shade200,
                         child: const Center(
                           child: Icon(
-                            Icons.broken_image,
-                            size: 50,
+                            Icons.broken_image_rounded,
+                            size: 52,
                             color: Colors.grey,
                           ),
                         ),
@@ -83,7 +83,7 @@ class DestinoCard extends StatelessWidget {
                     right: 8,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withOpacity(0.92),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
@@ -103,7 +103,7 @@ class DestinoCard extends StatelessWidget {
                           try {
                             await favoritoProvider.toggleFavorito(
                               session.user!.uid,
-                              destino.id,
+                              destino,
                             );
                             
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -168,14 +168,14 @@ class DestinoCard extends StatelessWidget {
 
             // Información
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     destino.nombre,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 21,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -239,12 +239,10 @@ class DestinoCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  
-                  // 👈 MOSTRAR CALIFICACIÓN CON ESTRELLAS
+
                   if (destino.promedioCalificacion != null && destino.promedioCalificacion! > 0) ...[
                     Row(
                       children: [
-                        // Estrellas
                         ...List.generate(5, (index) {
                           final starValue = index + 1;
                           final isFullStar = starValue <= destino.promedioCalificacion!.round();
@@ -280,15 +278,14 @@ class DestinoCard extends StatelessWidget {
                     const SizedBox(height: 8),
                   ],
 
-                  // Clima
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: 14,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.blue.shade50.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -316,6 +313,7 @@ class DestinoCard extends StatelessWidget {
                     destino.descripcion,
                     style: TextStyle(
                       color: Colors.grey.shade700,
+                      height: 1.45,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

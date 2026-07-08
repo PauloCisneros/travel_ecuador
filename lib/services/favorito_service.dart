@@ -1,80 +1,77 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/favorito_model.dart';
+import 'dart:convert';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/destino_model.dart';
 
 class FavoritoService {
-  final SupabaseClient _client = Supabase.instance.client;
+  String _favoritesKey(String uid) => 'favoritos_$uid';
+
+  Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
+
+  Future<List<Destino>> _readFavorites(String uid) async {
+    final prefs = await _prefs;
+    final stored = prefs.getStringList(_favoritesKey(uid)) ?? <String>[];
+
+    return stored
+        .map((item) => Destino.fromMap(jsonDecode(item) as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> _writeFavorites(String uid, List<Destino> destinos) async {
+    final prefs = await _prefs;
+    final serialized = destinos.map((destino) => jsonEncode(destino.toMap())).toList();
+    await prefs.setStringList(_favoritesKey(uid), serialized);
+  }
 
   // Agregar a favoritos
-  Future<Favorito> addFavorito(String uid, String destinoId) async {
-    final response = await _client
-        .from('favoritos')
-        .insert({
-          'uid': uid,
-          'destino_id': destinoId,
-        })
-        .select()
-        .single();
+  Future<void> addFavorito(String uid, Destino destino) async {
+    final favoritos = await _readFavorites(uid);
+    if (favoritos.any((item) => item.id == destino.id)) {
+      return;
+    }
 
-    return Favorito.fromMap(response);
+    favoritos.add(destino);
+    await _writeFavorites(uid, favoritos);
   }
 
   // Eliminar de favoritos
   Future<void> removeFavorito(String uid, String destinoId) async {
-    await _client
-        .from('favoritos')
-        .delete()
-        .eq('uid', uid)
-        .eq('destino_id', destinoId);
+    final favoritos = await _readFavorites(uid);
+    favoritos.removeWhere((destino) => destino.id == destinoId);
+    await _writeFavorites(uid, favoritos);
   }
 
   // Verificar si un destino está en favoritos
   Future<bool> isFavorito(String uid, String destinoId) async {
-    final response = await _client
-        .from('favoritos')
-        .select()
-        .eq('destino_id', destinoId)
-        .maybeSingle();
-
-    return response != null;
+    final favoritos = await _readFavorites(uid);
+    return favoritos.any((destino) => destino.id == destinoId);
   }
 
   // Obtener todos los favoritos de un usuario
-  Future<List<Favorito>> getFavoritosByUser(String uid) async {
-    final response = await _client
-        .from('favoritos')
-        .select()
-        .order('created_at', ascending: false);
-
-    return response.map((map) => Favorito.fromMap(map)).toList();
+  Future<List<Destino>> getFavoritosByUser(String uid) async {
+    return _readFavorites(uid);
   }
 
   // Obtener los destinos favoritos de un usuario
   Future<List<Destino>> getDestinosFavoritos(String uid) async {
-    final response = await _client
-        .from('favoritos')
-        .select('''
-          *,
-          destinos (*)
-        ''')
-        .order('created_at', ascending: false);
-
-    final List<Destino> destinos = [];
-    for (var item in response) {
-      final destinoData = item['destinos'] as Map<String, dynamic>;
-      destinos.add(Destino.fromMap(destinoData));
-    }
-
-    return destinos;
+    return _readFavorites(uid);
   }
 
   // Contar cuántos favoritos tiene un destino
   Future<int> countFavoritosByDestino(String destinoId) async {
-    final response = await _client
-        .from('favoritos')
-        .select('count')
-        .eq('destino_id', destinoId);
+    final prefs = await _prefs;
+    final allKeys = prefs.getKeys().where((key) => key.startsWith('favoritos_'));
+    var total = 0;
 
-    return response.length;
+    for (final key in allKeys) {
+      final stored = prefs.getStringList(key) ?? <String>[];
+      total += stored.where((item) {
+        final destino = Destino.fromMap(jsonDecode(item) as Map<String, dynamic>);
+        return destino.id == destinoId;
+      }).length;
+    }
+
+    return total;
   }
 }

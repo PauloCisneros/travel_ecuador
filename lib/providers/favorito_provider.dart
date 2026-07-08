@@ -23,7 +23,7 @@ class FavoritoProvider extends ChangeNotifier {
 
     try {
       final favoritos = await _favoritoService.getFavoritosByUser(uid);
-      _favoritosIds = favoritos.map((f) => f.destinoId).toList();
+      _favoritosIds = favoritos.map((f) => f.id).toList();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -40,6 +40,7 @@ class FavoritoProvider extends ChangeNotifier {
 
     try {
       _destinosFavoritos = await _favoritoService.getDestinosFavoritos(uid);
+      _favoritosIds = _destinosFavoritos.map((destino) => destino.id).toList();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -49,11 +50,14 @@ class FavoritoProvider extends ChangeNotifier {
   }
 
   // Agregar a favoritos
-  Future<void> addFavorito(String uid, String destinoId) async {
+  Future<void> addFavorito(String uid, Destino destino) async {
     try {
-      await _favoritoService.addFavorito(uid, destinoId);
-      if (!_favoritosIds.contains(destinoId)) {
-        _favoritosIds.add(destinoId);
+      await _favoritoService.addFavorito(uid, destino);
+      if (!_favoritosIds.contains(destino.id)) {
+        _favoritosIds.add(destino.id);
+      }
+      if (!_destinosFavoritos.any((item) => item.id == destino.id)) {
+        _destinosFavoritos.add(destino);
       }
       notifyListeners();
     } catch (e) {
@@ -81,11 +85,11 @@ class FavoritoProvider extends ChangeNotifier {
   }
 
   // Alternar favorito (agregar/quitar)
-  Future<void> toggleFavorito(String uid, String destinoId) async {
-    if (isFavorito(destinoId)) {
-      await removeFavorito(uid, destinoId);
+  Future<void> toggleFavorito(String uid, Destino destino) async {
+    if (isFavorito(destino.id)) {
+      await removeFavorito(uid, destino.id);
     } else {
-      await addFavorito(uid, destinoId);
+      await addFavorito(uid, destino);
     }
   }
 

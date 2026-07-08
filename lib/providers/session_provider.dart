@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
-import 'favorito_provider.dart'; // 👈 Importar FavoritoProvider
 
 class SessionProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -67,11 +66,6 @@ class SessionProvider extends ChangeNotifier {
     try {
       await _authService.signOut();
       _user = null;
-      
-      // 👇 Limpiar favoritos al cerrar sesión
-      final favoritoProvider = FavoritoProvider();
-      favoritoProvider.clearFavoritos();
-      
     } finally {
       _isLoading = false;
       notifyListeners();

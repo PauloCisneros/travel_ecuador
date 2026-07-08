@@ -58,75 +58,86 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
+      // Fondo sutil para dar contraste con la tarjeta
+      backgroundColor: colorScheme.surfaceContainerLow,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    isLogin ? 'Iniciar sesión' : 'Crear cuenta',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium,
+            child: Column(
+              children: [
+                // Un icono o logo que represente el turismo
+                Icon(Icons.landscape_rounded, size: 80, color: colorScheme.primary),
+                const SizedBox(height: 16),
+                Text(
+                  isLogin ? '¡Bienvenido de vuelta!' : 'Comienza tu aventura',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
                   ),
-                  const SizedBox(height: 24),
-                  TextFormField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Correo'),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Ingresa tu correo';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Correo inválido';
-                      }
-                      return null;
-                    },
+                ),
+                const SizedBox(height: 32),
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(color: colorScheme.outlineVariant),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: passwordController,
-                    obscureText: obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            obscurePassword = !obscurePassword;
-                          });
-                        },
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: formKey,
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              labelText: 'Correo electrónico',
+                              prefixIcon: Icon(Icons.email_outlined),
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (value) => (value == null || !value.contains('@')) ? 'Correo inválido' : null,
+                          ),
+                          const SizedBox(height: 20),
+                          TextFormField(
+                            controller: passwordController,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Contraseña',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                              ),
+                            ),
+                            validator: (value) => (value?.length ?? 0) < 6 ? 'Mínimo 6 caracteres' : null,
+                          ),
+                          const SizedBox(height: 32),
+                          FilledButton(
+                            onPressed: loading ? null : submit,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 54),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: loading 
+                                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : Text(isLogin ? 'Iniciar sesión' : 'Registrarse', style: const TextStyle(fontSize: 16)),
+                          ),
+                        ],
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Ingresa tu contraseña';
-                      }
-                      if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
-                      }
-                      return null;
-                    },
                   ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: loading ? null : submit,
-                    child: Text(loading ? 'Procesando...' : (isLogin ? 'Entrar' : 'Registrarse')),
-                  ),
-                  TextButton(
-                    onPressed: loading ? null : () => setState(() => isLogin = !isLogin),
-                    child: Text(isLogin ? 'Crear cuenta' : 'Ya tengo cuenta'),
-                  ),
-                ],
-              ),
+                ),
+                TextButton(
+                  onPressed: loading ? null : () => setState(() => isLogin = !isLogin),
+                  child: Text(isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'),
+                ),
+              ],
             ),
           ),
         ),

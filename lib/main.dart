@@ -39,8 +39,30 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
         useMaterial3: true,
+        // Colores
+        colorScheme: const ColorScheme(
+          brightness: Brightness.light,
+          primary: Color(0xFFE65100),
+          onPrimary: Colors.white,
+          secondary: Color(0xFF2E7D32),
+          onSecondary: Colors.white,
+          error: Color(0xFFD32F2F),
+          onError: Colors.white,
+          surface: Colors.white,
+          onSurface: Colors.black87,
+        ),
+        // Tipografía moderna
+        fontFamily: 'Montserrat', 
+        // Estilo global para botones
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE65100),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       ),
       home: const AuthGate(),
     );
@@ -92,6 +114,17 @@ class _MainTabsScreenState extends State<MainTabsScreen> {
       label: 'Perfil',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final session = context.read<SessionProvider>();
+      if (session.user != null) {
+        await context.read<FavoritoProvider>().loadFavoritos(session.user!.uid);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

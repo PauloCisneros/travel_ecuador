@@ -71,10 +71,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Mis Favoritos'),
+        centerTitle: true,
         backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -87,35 +90,52 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _destinosFavoritos.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.favorite_border,
-                        size: 80,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No tienes favoritos',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade600,
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Toca el corazón ❤️ en los destinos para agregarlos',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade500,
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite_border,
+                          size: 76,
+                          color: Colors.grey.shade400,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No tienes favoritos',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Toca el corazón en los destinos para agregarlos.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: _destinosFavoritos.length,
                   itemBuilder: (context, index) {
                     final destino = _destinosFavoritos[index];

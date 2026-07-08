@@ -306,7 +306,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                   try {
                     await favoritoProvider.toggleFavorito(
                       session.user!.uid,
-                      widget.destino.id,
+                      widget.destino,
                     );
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(

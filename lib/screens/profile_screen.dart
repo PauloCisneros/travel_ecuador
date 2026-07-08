@@ -140,35 +140,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Perfil del usuario
-          Column(
-            children: [
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.deepOrange.shade100,
-                child: Text(
-                  user.nombre.isNotEmpty ? user.nombre[0].toUpperCase() : '?',
-                  style: const TextStyle(fontSize: 40),
-                ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.deepOrange.shade500,
+                  Colors.deepOrange.shade300,
+                ],
               ),
-              const SizedBox(height: 20),
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.deepOrange.withOpacity(0.18),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 54,
+                  backgroundColor: Colors.white.withOpacity(0.18),
+                  child: Text(
+                    user.nombre.isNotEmpty ? user.nombre[0].toUpperCase() : '?',
+                    style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 18),
               if (!isEditing) ...[
                 Text(
                   user.nombre,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   user.email,
-                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.9)),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  'ID: ${user.uid}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'ID: ${user.uid.substring(0, 8)}...',
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                  ),
                 ),
                 const SizedBox(height: 30),
                 ElevatedButton.icon(
@@ -181,9 +210,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: const Icon(Icons.edit),
                   label: const Text('Editar nombre'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.deepOrange,
                     minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                 ),
               ] else ...[
@@ -200,6 +230,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepOrange,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
                         onPressed: () async {
                           if (nombreController.text.trim().isNotEmpty) {
                             try {
@@ -223,6 +259,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.deepOrange,
+                          side: BorderSide(color: Colors.deepOrange.shade200),
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
                         onPressed: () {
                           setState(() {
                             isEditing = false;
@@ -260,6 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
 
                   if (confirm == true) {
+                    context.read<FavoritoProvider>().clearFavoritos();
                     await context.read<SessionProvider>().logout();
                   }
                 },
@@ -269,12 +312,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
           
-          const Divider(thickness: 2, height: 40),
+          const SizedBox(height: 20),
+          const Divider(thickness: 2, height: 28),
           
           // Sección "Mis Destinos"
           Row(
@@ -321,7 +367,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             )
           else if (_misDestinos.isEmpty)
             Container(
-              padding: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(28),
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
               child: Column(
                 children: [
                   Icon(
@@ -330,19 +388,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Colors.grey.shade400,
                   ),
                   const SizedBox(height: 16),
-                  Text(
+                  const Text(
                     'No has agregado destinos aún',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Toca el + para agregar tu primer destino',
+                    'Usa el botón + para crear tu primer destino.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade500,
+                      color: Colors.grey.shade600,
                     ),
                   ),
                 ],

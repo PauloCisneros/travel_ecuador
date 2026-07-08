@@ -106,7 +106,7 @@ class DestinoCardEditable extends StatelessWidget {
                         try {
                           await favoritoProvider.toggleFavorito(
                             session.user!.uid,
-                            destino.id,
+                              destino,
                           );
                           
                           ScaffoldMessenger.of(context).showSnackBar(
