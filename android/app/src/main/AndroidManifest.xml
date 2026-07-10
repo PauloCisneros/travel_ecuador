@@ -10,7 +10,7 @@
     <application
         android:label="travel_ecuador"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
 
         <!-- Agrega tu API Key de Google Maps -->
         <meta-data

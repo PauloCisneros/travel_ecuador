@@ -448,6 +448,27 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
             ),
             const SizedBox(height: 16),
 
+            if (widget.destino.nombreCreador != null && widget.destino.nombreCreador!.isNotEmpty) ...[
+              Row(
+                children: [
+                  Icon(
+                    Icons.person,
+                    size: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Creado por: ${widget.destino.nombreCreador}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+
             // Descripción
             Text(
               widget.destino.descripcion,

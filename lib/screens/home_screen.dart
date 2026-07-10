@@ -35,18 +35,38 @@ class _HomeScreenState extends State<HomeScreen> {
       final supabase = Supabase.instance.client;
       final visitaService = VisitaService();
       
-      // CONSULTA MÁS SIMPLE - Sin relaciones
+      // Obtener destinos
       final response = await supabase
           .from('destinos')
           .select('*');
       
       print('Total en BD: ${response.length}');
       
-      // Mapear directamente sin relaciones complejas
+      // Obtener los UIDs únicos de los creadores
+      final uids = response.map((map) => map['uid'] as String).toSet().toList();
+      
+      // Obtener nombres de usuario de la tabla 'users'
+      Map<String, String> nombresUsuarios = {};
+      if (uids.isNotEmpty) {
+        final usersResponse = await supabase
+            .from('users')
+            .select('uid, nombre')
+            .inFilter('uid', uids);
+        
+        for (var user in usersResponse) {
+          nombresUsuarios[user['uid']] = user['nombre'] ?? 'Usuario';
+        }
+      }
+      
+      // Mapear destinos con el nombre del creador
       _destinos = response.map((map) {
-        return Destino.fromMap(map);
+        final destinoMap = Map<String, dynamic>.from(map);
+        final uid = map['uid'] as String;
+        destinoMap['nombre_creador'] = nombresUsuarios[uid] ?? 'Usuario';
+        return Destino.fromMap(destinoMap);
       }).toList();
 
+      // Cargar calificaciones
       if (_destinos.isNotEmpty) {
         final destinoIds = _destinos.map((d) => d.id).toList();
         final calificaciones = await visitaService.getCalificacionesForDestinos(destinoIds);

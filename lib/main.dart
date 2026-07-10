@@ -11,6 +11,8 @@ import 'screens/home_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/profile_screen.dart';
 
+import 'splash_screen.dart'; // Importa el splash screen
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -40,7 +42,8 @@ class MainApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        // Colores
+        // Si no tienes la fuente, comenta esta línea
+        // fontFamily: 'Montserrat',
         colorScheme: const ColorScheme(
           brightness: Brightness.light,
           primary: Color(0xFFE65100),
@@ -52,9 +55,6 @@ class MainApp extends StatelessWidget {
           surface: Colors.white,
           onSurface: Colors.black87,
         ),
-        // Tipografía moderna
-        fontFamily: 'Montserrat', 
-        // Estilo global para botones
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFE65100),
@@ -64,8 +64,20 @@ class MainApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      // Cambia esto para mostrar el SplashScreen primero
+      home: const SplashScreenWrapper(),
+      // home: const AuthGate(), // Ya no usamos esto directamente
     );
+  }
+}
+
+// Wrapper que decide qué mostrar después del splash
+class SplashScreenWrapper extends StatelessWidget {
+  const SplashScreenWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const SplashScreen();
   }
 }
 

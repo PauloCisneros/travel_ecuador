@@ -198,27 +198,6 @@ class DestinoCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  if (destino.nombreCreador != null) ...[
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person,
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Creado por: ${destino.nombreCreador}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-
                   if (destino.nombreCreador != null && destino.nombreCreador!.isNotEmpty) ...[
                     Row(
                       children: [
