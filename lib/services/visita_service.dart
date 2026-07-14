@@ -4,6 +4,26 @@ import '../models/visita_model.dart';
 class VisitaService {
   final SupabaseClient _client = Supabase.instance.client;
 
+  Future<void> _actualizarCache(String destinoId) async {
+    final response = await _client
+        .from('visitas')
+        .select('calificacion')
+        .eq('destino_id', destinoId);
+
+    final total = response.length;
+    final promedio = total > 0
+        ? response.fold<int>(0, (sum, item) => sum + (item['calificacion'] as int)) / total
+        : 0.0;
+
+    await _client
+        .from('destinos')
+        .update({
+          'promedio_calificacion': promedio,
+          'total_calificaciones': total,
+        })
+        .eq('id', destinoId);
+  }
+
   // Crear una nueva visita/reseña
   Future<Visita> createVisita({
     required String destinoId,
@@ -22,6 +42,8 @@ class VisitaService {
         .select()
         .single();
 
+    _actualizarCache(destinoId);
+
     return Visita.fromMap(response);
   }
 
@@ -31,7 +53,7 @@ class VisitaService {
         .from('visitas')
         .select('''
           *,
-          users!inner (
+          users (
             nombre
           )
         ''')
@@ -135,6 +157,7 @@ class VisitaService {
     required int visitaId,
     required int calificacion,
     String? comentario,
+    required String destinoId,
   }) async {
     final response = await _client
         .from('visitas')
@@ -146,14 +169,49 @@ class VisitaService {
         .select()
         .single();
 
+    _actualizarCache(destinoId);
+
     return Visita.fromMap(response);
   }
 
   // Eliminar una visita
-  Future<void> deleteVisita(int visitaId) async {
+  Future<void> deleteVisita(int visitaId, String destinoId) async {
     await _client
         .from('visitas')
         .delete()
         .eq('id', visitaId);
+
+    _actualizarCache(destinoId);
+  }
+
+  Future<Map<String, int>> getResumenCalificacionesForDestinos(
+      List<String> destinoIds) async {
+    if (destinoIds.isEmpty) {
+      return {'positivas': 0, 'neutras': 0, 'negativas': 0, 'total': 0};
+    }
+
+    final response = await _client
+        .from('visitas')
+        .select('calificacion')
+        .inFilter('destino_id', destinoIds);
+
+    int positivas = 0, neutras = 0, negativas = 0;
+    for (final item in response) {
+      final cal = item['calificacion'] as int;
+      if (cal >= 4) {
+        positivas++;
+      } else if (cal == 3) {
+        neutras++;
+      } else {
+        negativas++;
+      }
+    }
+
+    return {
+      'positivas': positivas,
+      'neutras': neutras,
+      'negativas': negativas,
+      'total': positivas + neutras + negativas,
+    };
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'providers/session_provider.dart';
 import 'providers/favorito_provider.dart';
 import 'providers/visita_provider.dart';
@@ -12,13 +11,14 @@ import 'screens/favorites_screen.dart';
 import 'screens/profile_screen.dart';
 
 import 'splash_screen.dart'; // Importa el splash screen
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://shjbxvpgxkmmkphsjkar.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoamJ4dnBneGttbWtwaHNqa2FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNzQzMjIsImV4cCI6MjA5Mzc1MDMyMn0.cOgEY692nXZgovRSa_IRq-FJb_JKOcoYFQfn6Z3C74Q',
+    url: 'https://zjjalezwyjrlykkhtwcj.supabase.co',
+    publishableKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqamFsZXp3eWpybHlra2h0d2NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNzU1ODQsImV4cCI6MjA5Mzc1MTU4NH0._yegNjxY491ppNIj5BFAgtYK5HwlWVipMFKc9bFCOyg',
   );
 
   runApp(
@@ -40,30 +40,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        // Si no tienes la fuente, comenta esta línea
-        // fontFamily: 'Montserrat',
-        colorScheme: const ColorScheme(
-          brightness: Brightness.light,
-          primary: Color(0xFFE65100),
-          onPrimary: Colors.white,
-          secondary: Color(0xFF2E7D32),
-          onSecondary: Colors.white,
-          error: Color(0xFFD32F2F),
-          onError: Colors.white,
-          surface: Colors.white,
-          onSurface: Colors.black87,
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFE65100),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
+      theme: AppTheme.light,
       // Cambia esto para mostrar el SplashScreen primero
       home: const SplashScreenWrapper(),
       // home: const AuthGate(), // Ya no usamos esto directamente
@@ -141,7 +118,12 @@ class _MainTabsScreenState extends State<MainTabsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
+      // Colores heredados de bottomNavigationBarTheme (AppTheme.light),
+      // ya no se fijan aquí de forma manual.
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -150,9 +132,6 @@ class _MainTabsScreenState extends State<MainTabsScreen> {
           });
         },
         items: _bottomNavItems,
-        selectedItemColor: Colors.deepOrange,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
       ),
     );
   }

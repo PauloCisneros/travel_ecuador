@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/destino_model.dart';
-import '../services/favorito_service.dart';
+import '../services/favorito_supabase_service.dart';
 
 class FavoritoProvider extends ChangeNotifier {
-  final FavoritoService _favoritoService = FavoritoService();
-  
-  List<String> _favoritosIds = []; // IDs de destinos favoritos
+  final FavoritoSupabaseService _favoritoService = FavoritoSupabaseService();
+
+  List<String> _favoritosIds = [];
   List<Destino> _destinosFavoritos = [];
   bool _isLoading = false;
   String? _error;
@@ -15,15 +16,13 @@ class FavoritoProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Cargar favoritos del usuario
   Future<void> loadFavoritos(String uid) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final favoritos = await _favoritoService.getFavoritosByUser(uid);
-      _favoritosIds = favoritos.map((f) => f.id).toList();
+      _favoritosIds = await _favoritoService.getFavoritosIds(uid);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -32,15 +31,44 @@ class FavoritoProvider extends ChangeNotifier {
     }
   }
 
-  // Cargar destinos favoritos
   Future<void> loadDestinosFavoritos(String uid) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      _destinosFavoritos = await _favoritoService.getDestinosFavoritos(uid);
-      _favoritosIds = _destinosFavoritos.map((destino) => destino.id).toList();
+      _favoritosIds = await _favoritoService.getFavoritosIds(uid);
+
+      if (_favoritosIds.isNotEmpty) {
+        final supabase = Supabase.instance.client;
+        final response = await supabase
+            .from('destinos')
+            .select()
+            .inFilter('id', _favoritosIds);
+
+        final uids = response.map((map) => map['uid'] as String).toSet().toList();
+
+        Map<String, String> nombresUsuarios = {};
+        if (uids.isNotEmpty) {
+          final usersResponse = await supabase
+              .from('users')
+              .select('uid, nombre')
+              .inFilter('uid', uids);
+
+          for (var user in usersResponse) {
+            nombresUsuarios[user['uid']] = user['nombre'] ?? 'Usuario';
+          }
+        }
+
+        _destinosFavoritos = response.map((map) {
+          final destinoMap = Map<String, dynamic>.from(map);
+          final uid = map['uid'] as String;
+          destinoMap['nombre_creador'] = nombresUsuarios[uid] ?? 'Usuario';
+          return Destino.fromMap(destinoMap);
+        }).toList();
+      } else {
+        _destinosFavoritos = [];
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -49,15 +77,11 @@ class FavoritoProvider extends ChangeNotifier {
     }
   }
 
-  // Agregar a favoritos
-  Future<void> addFavorito(String uid, Destino destino) async {
+  Future<void> addFavorito(String uid, String destinoId) async {
     try {
-      await _favoritoService.addFavorito(uid, destino);
-      if (!_favoritosIds.contains(destino.id)) {
-        _favoritosIds.add(destino.id);
-      }
-      if (!_destinosFavoritos.any((item) => item.id == destino.id)) {
-        _destinosFavoritos.add(destino);
+      await _favoritoService.addFavorito(uid, destinoId);
+      if (!_favoritosIds.contains(destinoId)) {
+        _favoritosIds.add(destinoId);
       }
       notifyListeners();
     } catch (e) {
@@ -66,7 +90,6 @@ class FavoritoProvider extends ChangeNotifier {
     }
   }
 
-  // Eliminar de favoritos
   Future<void> removeFavorito(String uid, String destinoId) async {
     try {
       await _favoritoService.removeFavorito(uid, destinoId);
@@ -79,21 +102,22 @@ class FavoritoProvider extends ChangeNotifier {
     }
   }
 
-  // Verificar si un destino está en favoritos
   bool isFavorito(String destinoId) {
     return _favoritosIds.contains(destinoId);
   }
 
-  // Alternar favorito (agregar/quitar)
-  Future<void> toggleFavorito(String uid, Destino destino) async {
-    if (isFavorito(destino.id)) {
-      await removeFavorito(uid, destino.id);
+  Future<void> toggleFavorito(String uid, String destinoId) async {
+    if (isFavorito(destinoId)) {
+      await removeFavorito(uid, destinoId);
     } else {
-      await addFavorito(uid, destino);
+      await addFavorito(uid, destinoId);
     }
   }
 
-  // Limpiar favoritos (al cerrar sesión)
+  void notify() {
+    notifyListeners();
+  }
+
   void clearFavoritos() {
     _favoritosIds = [];
     _destinosFavoritos = [];

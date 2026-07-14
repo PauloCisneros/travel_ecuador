@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
 
@@ -72,12 +71,32 @@ class SessionProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile(String nombre, {String? email}) async {
+  Future<void> updateProfile(String nombre, {String? email, String? avatarUrl}) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      await _authService.updateUserProfile(nombre: nombre, email: email);
+      await _authService.updateUserProfile(
+        nombre: nombre,
+        email: email ?? _user?.email,
+        avatarUrl: avatarUrl,
+      );
+      await _loadUserProfile();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateAvatar(String avatarUrl) async {
+    if (_user == null) return;
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await _authService.updateUserProfile(
+        nombre: _user!.nombre,
+        avatarUrl: avatarUrl,
+      );
       await _loadUserProfile();
     } finally {
       _isLoading = false;

@@ -56,6 +56,7 @@ class VisitaProvider extends ChangeNotifier {
     required String uid,
     required int calificacion,
     String? comentario,
+    String? nombreUsuario,
   }) async {
     _isLoading = true;
     _error = null;
@@ -69,6 +70,7 @@ class VisitaProvider extends ChangeNotifier {
         comentario: comentario,
       );
       
+      newVisita.nombreUsuario = nombreUsuario;
       _visitas.insert(0, newVisita);
       _userVisita = newVisita;
       _userHasVisited = true;
@@ -103,11 +105,13 @@ class VisitaProvider extends ChangeNotifier {
         visitaId: visitaId,
         calificacion: calificacion,
         comentario: comentario,
+        destinoId: destinoId,
       );
       
-      // Actualizar en la lista
+      // Actualizar en la lista preservando el nombre del usuario
       final index = _visitas.indexWhere((v) => v.id == visitaId);
       if (index != -1) {
+        updatedVisita.nombreUsuario = _visitas[index].nombreUsuario;
         _visitas[index] = updatedVisita;
       }
       
@@ -133,7 +137,7 @@ class VisitaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _visitaService.deleteVisita(visitaId);
+      await _visitaService.deleteVisita(visitaId, destinoId);
       
       _visitas.removeWhere((v) => v.id == visitaId);
       _userVisita = null;

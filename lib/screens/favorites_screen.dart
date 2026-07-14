@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:travel_ecuador/models/destino_model.dart';
 import '../providers/favorito_provider.dart';
 import '../providers/session_provider.dart';
-import '../providers/visita_provider.dart'; 
+import '../models/destino_model.dart';
+import '../models/categorias_destino.dart';
 import '../widgets/destino_card.dart';
-import '../services/visita_service.dart';  
+import '../services/snackbar_service.dart';
+import '../theme/app_theme.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -15,136 +16,265 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  bool _isLoading = true;
-  List<Destino> _destinosFavoritos = [];
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String? _categoriaFiltro;
+
+  String _sinAcentos(String s) => s
+      .toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ü', 'u')
+      .replaceAll('ñ', 'n')
+      .replaceAll('ç', 'c');
+
+  List<Destino> get _destinosFiltrados {
+    return context.read<FavoritoProvider>().destinosFavoritos.where((d) {
+      final q = _sinAcentos(_searchQuery);
+      return (q.isEmpty || _sinAcentos(d.nombre).contains(q)) &&
+          (_categoriaFiltro == null || d.categoria == _categoriaFiltro);
+    }).toList();
+  }
 
   @override
   void initState() {
     super.initState();
-    _cargarFavoritos();
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _cargarFavoritos());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarFavoritos() async {
-    setState(() => _isLoading = true);
-    
+    final favoritoProvider = context.read<FavoritoProvider>();
+    if (favoritoProvider.isLoading) return;
+
     try {
-      final session = Provider.of<SessionProvider>(context, listen: false);
-      final favoritoProvider = Provider.of<FavoritoProvider>(context, listen: false);
-      final visitaService = VisitaService(); 
-      
+      final session = context.read<SessionProvider>();
+
       if (session.user != null) {
         await favoritoProvider.loadDestinosFavoritos(session.user!.uid);
-        
-        // Obtener los destinos favoritos con sus calificaciones
-        final destinos = favoritoProvider.destinosFavoritos;
-        
-        if (destinos.isNotEmpty) {
-          final destinoIds = destinos.map((d) => d.id).toList();
-          final calificaciones = await visitaService.getCalificacionesForDestinos(destinoIds);
-          
-          // Asignar calificaciones a cada destino
-          _destinosFavoritos = destinos.map((destino) {
-            final data = calificaciones[destino.id];
-            if (data != null) {
-              return destino.copyWith(
-                promedioCalificacion: data['promedio'],
-                totalCalificaciones: data['total'],
-              );
-            }
-            return destino;
-          }).toList();
-        } else {
-          _destinosFavoritos = destinos;
-        }
+        favoritoProvider.notify();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar favoritos: $e')),
-        );
+        SnackBarService.mostrarError(context, e);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildCategoriaChip(String label, String? key) {
+    final selected = _categoriaFiltro == key;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        labelStyle: TextStyle(
+          color: selected ? Colors.white : AppColors.tinta,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+        onSelected: (_) {
+          setState(() {
+            _categoriaFiltro = selected ? null : key;
+          });
+        },
+        visualDensity: VisualDensity.compact,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final favoritoProvider = context.watch<FavoritoProvider>();
+    final destinos = favoritoProvider.destinosFavoritos;
+    final filtrados = _destinosFiltrados;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Mis Favoritos'),
+        title: const Text('Mis favoritos'),
         centerTitle: true,
-        backgroundColor: Colors.deepOrange,
-        foregroundColor: Colors.white,
-        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _cargarFavoritos,
             tooltip: 'Recargar',
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _destinosFavoritos.isEmpty
-              ? Center(
-                  child: Container(
-                    margin: const EdgeInsets.all(24),
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.favorite_border,
-                          size: 76,
-                          color: Colors.grey.shade400,
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No tienes favoritos',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
+      body: favoritoProvider.isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.sol),
+            )
+          : destinos.isEmpty
+              ? _buildEmptyState()
+              : CustomScrollView(
+                  slivers: [
+                    // Búsqueda
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Buscar destino...',
+                            prefixIcon:
+                                const Icon(Icons.search_rounded),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon:
+                                        const Icon(Icons.clear_rounded),
+                                    onPressed: () =>
+                                        _searchController.clear(),
+                                  )
+                                : null,
+                            filled: true,
+                            fillColor: AppColors.lienzoAlterno,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding:
+                                const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Toca el corazón en los destinos para agregarlos.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
+                      ),
+                    ),
+
+                    // Categorías
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: SizedBox(
+                          height: 36,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.only(left: 16),
+                            children: [
+                              _buildCategoriaChip('Todas', null),
+                              ...categoriasKeys.map(
+                                (key) => _buildCategoriaChip(
+                                  categoriaLabels[key] ?? key,
+                                  key,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: _destinosFavoritos.length,
-                  itemBuilder: (context, index) {
-                    final destino = _destinosFavoritos[index];
-                    return DestinoCard(
-                      destino: destino,
-                      showFavoriteButton: false,
-                    );
-                  },
+
+                    // Resultados
+                    if (filtrados.isEmpty)
+                      SliverFillRemaining(
+                          child: _buildSinResultadosState())
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => DestinoCard(
+                              destino: filtrados[index],
+                              showFavoriteButton: true,
+                            ),
+                            childCount: filtrados.length,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: AppColors.solClaro,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.favorite_border_rounded,
+                size: 40,
+                color: AppColors.sol,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'No tienes favoritos todavía',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.tinta,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Toca el corazón en un destino para guardarlo aquí.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.musgo,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSinResultadosState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: AppColors.musgoClaro,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Sin resultados',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.tinta,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Intenta con otro nombre o categoría.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.musgo,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

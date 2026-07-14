@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/session_provider.dart';
+import '../services/snackbar_service.dart';
+import '../theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool loading = false;
   bool obscurePassword = true;
 
+  // ---- Lógica sin cambios ----
   Future<void> submit() async {
     if (!formKey.currentState!.validate()) {
       return;
@@ -29,21 +32,18 @@ class _LoginScreenState extends State<LoginScreen> {
       if (isLogin) {
         await session.login(emailController.text.trim(), passwordController.text);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login correcto')),
-        );
+        SnackBarService.mostrarExito(context, 'Inicio de sesión correcto');
       } else {
         await session.register(emailController.text.trim(), passwordController.text);
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro creado y perfil guardado en users. Revisa tu correo si Supabase pidió confirmación.')),
+        SnackBarService.mostrarExito(
+          context,
+          'Registro creado. Revisa tu correo si es necesario confirmar.',
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      SnackBarService.mostrarError(context, e);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -55,87 +55,108 @@ class _LoginScreenState extends State<LoginScreen> {
     passwordController.dispose();
     super.dispose();
   }
+  // ---- Fin lógica sin cambios ----
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      // Fondo sutil para dar contraste con la tarjeta
-      backgroundColor: colorScheme.surfaceContainerLow,
+      backgroundColor: AppColors.lienzo,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Un icono o logo que represente el turismo
-                Icon(Icons.landscape_rounded, size: 80, color: colorScheme.primary),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+                Image.asset(
+                  'assets/icon/icon.png',
+                  width: 72,
+                  height: 72,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(Icons.image_not_supported, size: 72);
+                  },
+                ),
+                const SizedBox(height: 28),
                 Text(
-                  isLogin ? '¡Bienvenido de vuelta!' : 'Comienza tu aventura',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
+                  isLogin ? 'Bienvenido de vuelta' : 'Crea tu cuenta',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isLogin
+                      ? 'Ingresa para seguir explorando Ecuador'
+                      : 'Guarda tus destinos favoritos y califica tus visitas',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.musgo,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 32),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: colorScheme.outlineVariant),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: formKey,
-                      child: Column(
-                        children: [
-                          TextFormField(
-                            controller: emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: const InputDecoration(
-                              labelText: 'Correo electrónico',
-                              prefixIcon: Icon(Icons.email_outlined),
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: (value) => (value == null || !value.contains('@')) ? 'Correo inválido' : null,
-                          ),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: passwordController,
-                            obscureText: obscurePassword,
-                            decoration: InputDecoration(
-                              labelText: 'Contraseña',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
-                                onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                              ),
-                            ),
-                            validator: (value) => (value?.length ?? 0) < 6 ? 'Mínimo 6 caracteres' : null,
-                          ),
-                          const SizedBox(height: 32),
-                          FilledButton(
-                            onPressed: loading ? null : submit,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 54),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: loading 
-                                ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : Text(isLogin ? 'Iniciar sesión' : 'Registrarse', style: const TextStyle(fontSize: 16)),
-                          ),
-                        ],
+                const SizedBox(height: 40),
+
+                // Formulario sin Card: minimalista, plano, con inputs de línea inferior
+                Form(
+                  key: formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(color: AppColors.tinta),
+                        decoration: const InputDecoration(
+                          labelText: 'Correo electrónico',
+                          prefixIcon: Icon(Icons.mail_outline_rounded),
+                        ),
+                        validator: (value) =>
+                            (value == null || !value.contains('@')) ? 'Correo inválido' : null,
                       ),
-                    ),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: passwordController,
+                        obscureText: obscurePassword,
+                        style: const TextStyle(color: AppColors.tinta),
+                        decoration: InputDecoration(
+                          labelText: 'Contraseña',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                            ),
+                            onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                          ),
+                        ),
+                        validator: (value) =>
+                            (value?.length ?? 0) < 6 ? 'Mínimo 6 caracteres' : null,
+                      ),
+                      const SizedBox(height: 36),
+                      FilledButton(
+                        onPressed: loading ? null : submit,
+                        child: loading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.4,
+                                ),
+                              )
+                            : Text(isLogin ? 'Iniciar sesión' : 'Registrarse'),
+                      ),
+                    ],
                   ),
                 ),
+
+                const SizedBox(height: 20),
                 TextButton(
                   onPressed: loading ? null : () => setState(() => isLogin = !isLogin),
-                  child: Text(isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'),
+                  child: Text(
+                    isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión',
+                  ),
                 ),
               ],
             ),

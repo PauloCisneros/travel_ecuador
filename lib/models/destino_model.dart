@@ -9,6 +9,7 @@ class Destino {
   final double temperatura;
   final int humedad;
   final String imagenUrl;
+  final String categoria;
   final String uid;
   final DateTime createdAt;
   double? promedioCalificacion;
@@ -26,11 +27,12 @@ class Destino {
     required this.temperatura,
     required this.humedad,
     required this.imagenUrl,
+    this.categoria = '',
     required this.uid,
     required this.createdAt,
     this.promedioCalificacion,
     this.totalCalificaciones,
-    this.nombreCreador, // 👈 Agregar al constructor
+    this.nombreCreador,
   });
 
   factory Destino.fromMap(Map<String, dynamic> map) {
@@ -45,6 +47,7 @@ class Destino {
       temperatura: (map['temperatura'] as num?)?.toDouble() ?? 0.0,
       humedad: map['humedad'] as int? ?? 0,
       imagenUrl: map['imagen_url'] as String? ?? '',
+      categoria: map['categoria'] as String? ?? '',
       uid: map['uid'] as String? ?? '',
       createdAt: map['created_at'] != null 
           ? DateTime.parse(map['created_at'] as String) 
@@ -67,6 +70,7 @@ class Destino {
       'temperatura': temperatura,
       'humedad': humedad,
       'imagen_url': imagenUrl,
+      'categoria': categoria,
       'uid': uid,
       'created_at': createdAt.toIso8601String(),
     };
@@ -83,6 +87,7 @@ class Destino {
     double? temperatura,
     int? humedad,
     String? imagenUrl,
+    String? categoria,
     String? uid,
     DateTime? createdAt,
     double? promedioCalificacion,
@@ -100,6 +105,7 @@ class Destino {
       temperatura: temperatura ?? this.temperatura,
       humedad: humedad ?? this.humedad,
       imagenUrl: imagenUrl ?? this.imagenUrl,
+      categoria: categoria ?? this.categoria,
       uid: uid ?? this.uid,
       createdAt: createdAt ?? this.createdAt,
       promedioCalificacion: promedioCalificacion ?? this.promedioCalificacion,
@@ -120,6 +126,7 @@ class Destino {
     required int humedad,
     required String imagenUrl,
     required String uid,
+    String categoria = '',
   }) {
     return Destino(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -132,6 +139,7 @@ class Destino {
       temperatura: temperatura,
       humedad: humedad,
       imagenUrl: imagenUrl,
+      categoria: categoria,
       uid: uid,
       createdAt: DateTime.now(),
     );

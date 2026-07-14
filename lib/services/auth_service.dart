@@ -54,14 +54,16 @@ class AuthService {
   Future<void> updateUserProfile({
     required String nombre,
     String? email,
+    String? avatarUrl,
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('Usuario no autenticado');
 
-    await _client.from('users').update({
-      'nombre': nombre,
-      if (email != null) 'email': email,
-    }).eq('uid', user.id);
+    final updates = <String, dynamic>{'nombre': nombre};
+    if (email != null) updates['email'] = email;
+    if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+
+    await _client.from('users').update(updates).eq('uid', user.id);
   }
 
   // Método para sincronizar el usuario autenticado con la tabla users
