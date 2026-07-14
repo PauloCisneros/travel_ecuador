@@ -13,7 +13,7 @@ Aplicación móvil Flutter para descubrir y compartir destinos turísticos en Ec
 | UI | Flutter 3.44 (Material 3) |
 | Estado | Provider + ChangeNotifier |
 | Backend | Supabase (Auth, Postgres, Storage) |
-| APIs externas | OpenWeatherMap (clima), Photon/OSM (geocodificación) |
+| APIs externas | OpenWeatherMap (clima), Photon/OSM (geocodificación), Overpass API (OSM) |
 | Almacenamiento local | SharedPreferences (favoritos) |
 | Mapas/Navegación | url_launcher (Google Maps, Waze) |
 | GPS | geolocator |
@@ -96,6 +96,7 @@ final visitaService = VisitaService();
 | `WeatherService` | OpenWeatherMap API | Clima por coordenadas |
 | `GeocodingService` | Photon API (OSM) | Nombre de lugar → lat/lng |
 | `GpsService` | geolocator (GPS) | Ubicación actual del dispositivo |
+| `OverpassService` | Overpass API | Búsqueda de sitios turísticos cercanos (tourism, radio 5km) |
 | `SnackbarService` | Flutter UI | Snackbars con mensajes amigables (incluye detección de errores de avatar) |
 
 ---
@@ -130,6 +131,11 @@ final visitaService = VisitaService();
 - **Uso:** Geocodificación de nombres de lugares a coordenadas.
 - **Detalles:** No soporta `lang=es` (retorna 400). Se concatenan `,Ecuador` al query y se filtran resultados por `countrycode: EC`. Retorna `[lon, lat]` (GeoJSON).
 
+### Overpass API (OpenStreetMap)
+- **Endpoint:** `overpass-api.de/api/interpreter`
+- **Uso:** Búsqueda de lugares turísticos cercanos a una ubicación GPS.
+- **Detalles:** Consulta `node` y `way` con `tourism=attraction|museum|viewpoint|gallery` en radio de 5km. Usa `out body center` para obtener centroides de ways. POST con fallback GET, timeout 25s. Sin API key.
+
 ---
 
 ## 8. Navegación / Rutas
@@ -138,7 +144,7 @@ final visitaService = VisitaService();
 SplashScreen (3s animación)
   └── AuthGate (decide según SessionProvider.isLoggedIn)
        ├── LoginScreen (si no logueado)
-       └── MainTabsScreen (BottomNavigationBar)
+       └── MainTabsScreen (IndexedStack — preserva estado entre tabs)
             ├── [0] HomeScreen → DestinoDetailScreen / AddDestinoScreen
             ├── [1] FavoritesScreen → DestinoDetailScreen
             └── [2] ProfileScreen → AddDestinoScreen (editar) / DestinoDetailScreen
@@ -154,11 +160,14 @@ lib/
 ├── splash_screen.dart            # Pantalla de carga animada (3s)
 ├── theme/
 │   └── app_theme.dart            # Paleta AppColors + temas globales (Material 3)
+├── utils/
+│   └── distancia.dart            # Función Haversine para calcular km entre coordenadas
 ├── models/
 │   ├── destino_model.dart        # Destino (id, nombre, provincia, coord, clima, etc.)
 │   ├── user.dart                 # AppUser (uid, nombre, email, avatarUrl)
 │   ├── favorito_model.dart       # Favorito (no usado activamente — migración futura)
 │   ├── visita_model.dart         # Visita (calificación 1-5, comentario)
+│   ├── sitio_osm.dart            # SitioOsm para resultados de Overpass API
 │   ├── categorias_destino.dart   # Mapas de categorías con labels e iconos
 │   └── provincias_ec.dart        # Lista constante de 24 provincias
 ├── providers/
@@ -168,11 +177,11 @@ lib/
 │   └── visita_provider.dart      # Visitas/calificaciones por destino
 ├── screens/
 │   ├── login_screen.dart         # Login/registro con validación
-│   ├── home_screen.dart          # Lista de destinos + búsqueda insensible a acentos + FAB
+│   ├── home_screen.dart          # Lista de destinos + búsqueda + FAB + "Cerca de mí" + Overpass
 │   ├── favorites_screen.dart     # Favoritos + búsqueda + filtros categoría
 │   ├── profile_screen.dart       # Perfil con avatar editable, dashboard, edit nombre, logout
 │   ├── destino_detail_screen.dart# Detalle + reseñas minimalistas + AppBar editar/eliminar (dueño)
-│   └── add_destino_screen.dart   # Formulario con DropdownMenu buscable + auto-geocoding
+│   └── add_destino_screen.dart   # Formulario con Autocomplete + auto-geocoding + params desde OSM
 ├── services/
 │   ├── auth_service.dart         # Supabase Auth + users table (incluye avatar_url)
 │   ├── favorito_service.dart     # SharedPreferences persistencia
@@ -181,10 +190,12 @@ lib/
 │   ├── weather_service.dart      # OpenWeatherMap API
 │   ├── geocoding_service.dart    # Photon API (OSM)
 │   ├── gps_service.dart          # geolocator GPS
+│   ├── overpass_service.dart     # Overpass API (tourism en radio 5km)
 │   └── snackbar_service.dart     # Snackbars con mensajes amigables
 └── widgets/
-    ├── destino_card.dart         # Card resumen (corazón, clima, estrellas)
+    ├── destino_card.dart         # Card resumen (corazón, clima, estrellas, distanciaKm opcional)
     ├── destino_card_editable.dart# Card con editar/eliminar (overlays oscuros)
+    ├── destino_osm_card.dart     # Card horizontal para resultados Overpass (nombre, tipo, distancia, botón Agregar)
     └── clima_resumen.dart        # Widget de clima reusable
 ```
 
@@ -212,6 +223,16 @@ lib/
 3. Provider actualiza listas internas y notifica
 4. UI se re-renderiza (corazón lleno/vacío)
 
+### Cerca de mí (ordenar por distancia + Overpass)
+1. Usuario toca icono `my_location_rounded` en AppBar de HomeScreen
+2. Si ya activo (guard de 2s contra misclick): se desactiva, restaura orden original
+3. Si no activo: `GpsService.getCurrentLocation()` → obtiene posición GPS
+4. Destinos se ordenan por distancia ascendente (Haversine) y muestran badge "X.X km"
+5. `OverpassService` consulta lugares turísticos cercanos en OSM (radio 5km, caché 10s)
+6. Sección "También cerca de ti" aparece con cards horizontales
+7. Cada card tiene botón "Agregar" → `AddDestinoScreen` con nombre y coordenadas pre-llenados + clima automático
+8. Estado persiste al cambiar de tabs (IndexedStack)
+
 ### Avatar (foto de perfil)
 1. Usuario toca avatar en `ProfileScreen`
 2. Bottom sheet: cámara o galería → `ImagePicker.pickImage()`
@@ -230,6 +251,11 @@ lib/
 - **DropdownMenu con búsqueda:** Provincia y categoría usan `DropdownMenu` con `enableSearch: true` + `enableFilter: true` — el usuario escribe para filtrar entre 24 opciones.
 - **Avatar en bucket separado (`avatars`):** Bucket público con upsert por uid, manejo de errores separado (upload vs db) con mensajes específicos.
 - **Búsqueda insensible a acentos:** Tanto en Home como en Favoritos, la búsqueda normaliza á→a, é→e, etc., para encontrar "Cafe" al buscar "Café".
+- **"Cerca de mí" opt-in:** El usuario activa manualmente tocando `my_location_rounded` en AppBar. No se activa automáticamente. Ordena destinos por distancia GPS y carga Overpass. El estado persiste al cambiar de tabs gracias a IndexedStack.
+- **Overpass API solo consulta:** Los resultados de Overpass NO se agregan a Supabase automáticamente. Se muestran en sección separada "También cerca de ti" con botón "Agregar" que pre-llena el formulario de nuevo destino. Caché de 10s entre consultas para evitar rate limiting.
+- **IndexedStack en tabs:** MainTabsScreen usa `IndexedStack` en vez de switch simple para preservar el estado de cada pantalla (scroll, filtros, "Cerca de mí", resultados Overpass) al cambiar entre tabs.
+- **Haversine inline:** El cálculo de distancia entre coordenadas se implementa como función inline con `dart:math`, sin dependencias externas.
+- **Rate limit y guard de misclick:** Las consultas a Overpass tienen un caché mínimo de 10s. El toggle de "Cerca de mí" ignora taps si pasaron menos de 2s del último toggle.
 - **AppColors como paleta fija:** Sin colores generados por `fromSeed` que introducían tintes morados en dropdowns. Se forza `canvasColor`, `surfaceContainerHigh`, y `menuTheme` a blancos para coherencia visual.
 - **Diálogos consistentes:** Todos los botones de acción destructiva usan `AppColors.musgo` (gris) en vez de rojo. Cancelar hereda `AppColors.sol` del `TextButtonTheme`.
 - **Botones de reseña:** Cancelar como `OutlinedButton`, Publicar como `FilledButton` — ambos con el mismo tamaño (flex:1).
@@ -253,6 +279,5 @@ lib/
 
 ## 13. Próximas Mejoras Potenciales
 
-- Implementar Overpass API (OpenStreetMap) para "sitios turísticos cercanos".
 - Soporte offline (Hive/Isar para datos locales).
 - Mejorar dashboard de perfil con más estadísticas y gráficos.
