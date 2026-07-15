@@ -13,6 +13,7 @@ import '../models/categorias_destino.dart';
 import '../providers/session_provider.dart';
 import '../providers/visita_provider.dart';
 import '../providers/favorito_provider.dart';
+import '../providers/destino_update_notifier.dart';
 import '../services/snackbar_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/clima_resumen.dart';
@@ -33,19 +34,39 @@ class DestinoDetailScreen extends StatefulWidget {
 class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
   late VisitaProvider _visitaProvider;
   late SessionProvider _sessionProvider;
+  late Destino _destino;
 
   int _calificacionSeleccionada = 0;
   final TextEditingController _comentarioController = TextEditingController();
   bool _isEditing = false;
+  bool _dataModificada = false;
   final ScrollController _scrollController = ScrollController();
 
 
-  @override
+@override
   void initState() {
     super.initState();
+    _destino = widget.destino;
     _visitaProvider = context.read<VisitaProvider>();
     _sessionProvider = context.read<SessionProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) => _cargarDatos());
+  }
+
+  Future<void> _recargarDestino() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('destinos')
+          .select()
+          .eq('id', _destino.id)
+          .single();
+      final map = Map<String, dynamic>.from(response);
+      if (_destino.nombreCreador != null) {
+        map['nombre_creador'] = _destino.nombreCreador;
+      }
+      if (!mounted) return;
+      setState(() => _destino = Destino.fromMap(map));
+    } catch (_) {}
   }
 
   @override
@@ -56,11 +77,11 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
   }
 
   Future<void> _cargarDatos() async {
-    await _visitaProvider.loadVisitas(widget.destino.id);
+    await _visitaProvider.loadVisitas(_destino.id);
 
     if (_sessionProvider.user != null) {
       await _visitaProvider.checkUserVisited(
-        widget.destino.id,
+        _destino.id,
         _sessionProvider.user!.uid,
       );
 
@@ -73,9 +94,9 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
 
   // Método para abrir Google Maps
   Future<void> _abrirGoogleMaps() async {
-    final lat = widget.destino.latitud;
-    final lng = widget.destino.longitud;
-    final nombre = Uri.encodeComponent(widget.destino.nombre);
+    final lat = _destino.latitud;
+    final lng = _destino.longitud;
+    final nombre = Uri.encodeComponent(_destino.nombre);
 
     // URL para Google Maps (funciona en móvil y web)
     final url = Uri.parse(
@@ -102,8 +123,8 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
   }
 
   Future<void> _abrirWaze() async {
-    final lat = widget.destino.latitud;
-    final lng = widget.destino.longitud;
+    final lat = _destino.latitud;
+    final lng = _destino.longitud;
 
     final url = Uri.parse('https://waze.com/ul?ll=$lat,$lng&navigate=yes');
 
@@ -172,7 +193,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
               _MapaOptionTile(
                 icon: Icons.copy_rounded,
                 title: 'Copiar coordenadas',
-                subtitle: '${widget.destino.latitud}, ${widget.destino.longitud}',
+                subtitle: '${_destino.latitud}, ${_destino.longitud}',
                 onTap: () {
                   Navigator.pop(context);
                   _copiarCoordenadas();
@@ -189,7 +210,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
   // Método para copiar coordenadas
   Future<void> _copiarCoordenadas() async {
     try {
-      final coordenadas = '${widget.destino.latitud}, ${widget.destino.longitud}';
+      final coordenadas = '${_destino.latitud}, ${_destino.longitud}';
       await Clipboard.setData(ClipboardData(text: coordenadas));
       if (mounted) {
         SnackBarService.mostrarExito(context, 'Coordenadas copiadas al portapapeles',
@@ -217,14 +238,14 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
           comentario: _comentarioController.text.trim().isEmpty
               ? null
               : _comentarioController.text.trim(),
-          destinoId: widget.destino.id,
+          destinoId: _destino.id,
         );
 
         if (!mounted) return;
         SnackBarService.mostrarExito(context, 'Reseña actualizada');
       } else {
         await _visitaProvider.addVisita(
-          destinoId: widget.destino.id,
+          destinoId: _destino.id,
           uid: _sessionProvider.user!.uid,
           calificacion: _calificacionSeleccionada,
           comentario: _comentarioController.text.trim().isEmpty
@@ -252,7 +273,14 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
     final visitaProvider = context.watch<VisitaProvider>();
     final session = context.watch<SessionProvider>();
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.pop(context, _dataModificada);
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.lienzo,
       body: CustomScrollView(
         slivers: [
@@ -272,12 +300,12 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
               padding: const EdgeInsets.only(left: 12),
               child: _CircleIconButton(
                 icon: Icons.arrow_back_rounded,
-                onTap: () => Navigator.pop(context),
+                onTap: () => Navigator.pop(context, _dataModificada),
               ),
             ),
             actions: [
               // Editar (solo dueño)
-              if (session.isLoggedIn && widget.destino.uid == session.user?.uid)
+              if (session.isLoggedIn && _destino.uid == session.user?.uid)
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: _CircleIconButton(
@@ -287,18 +315,26 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => AddDestinoScreen(
-                            destinoToEdit: widget.destino,
+                            destinoToEdit: _destino,
                           ),
                         ),
                       );
                       if (result == true && mounted) {
-                        _cargarDatos();
+                        await _recargarDestino();
+                        await _cargarDatos();
+                        _dataModificada = true;
+                        context.read<DestinoUpdateNotifier>().notify();
+                        if (session.user != null && context.mounted) {
+                          context
+                              .read<FavoritoProvider>()
+                              .refreshDestinosFavoritos(session.user!.uid);
+                        }
                       }
                     },
                   ),
                 ),
               // Eliminar (solo dueño)
-              if (session.isLoggedIn && widget.destino.uid == session.user?.uid)
+              if (session.isLoggedIn && _destino.uid == session.user?.uid)
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: _CircleIconButton(
@@ -309,7 +345,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                         builder: (context) => AlertDialog(
                           title: const Text('Eliminar destino'),
                           content: Text(
-                            '¿Estás seguro de que quieres eliminar "${widget.destino.nombre}"?',
+                            '¿Estás seguro de que quieres eliminar "${_destino.nombre}"?',
                           ),
                           actions: [
                             TextButton(
@@ -331,10 +367,17 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                           await Supabase.instance.client
                               .from('destinos')
                               .delete()
-                              .eq('id', widget.destino.id);
+                              .eq('id', _destino.id);
                           if (!mounted) return;
                           SnackBarService.mostrarExito(
                               context, 'Destino eliminado');
+                          
+                          // Notificar cambios globales para que Home y Favorites se refresquen
+                          context.read<DestinoUpdateNotifier>().notify();
+                          if (session.user != null && context.mounted) {
+                            context.read<FavoritoProvider>().refreshDestinosFavoritos(session.user!.uid);
+                          }
+                          
                           Navigator.pop(context);
                         } catch (e) {
                           if (!mounted) return;
@@ -358,7 +401,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                 ),
               Consumer<FavoritoProvider>(
                 builder: (context, favoritoProvider, _) {
-                  final isFavorito = favoritoProvider.isFavorito(widget.destino.id);
+                  final isFavorito = favoritoProvider.isFavorito(_destino.id);
                   return Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: _CircleIconButton(
@@ -368,7 +411,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                         try {
                           await favoritoProvider.toggleFavorito(
                             session.user!.uid,
-                            widget.destino.id,
+                            _destino.id,
                           );
                           if (!context.mounted) return;
                           SnackBarService.mostrarExito(
@@ -376,6 +419,12 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                             isFavorito ? 'Eliminado de favoritos' : 'Agregado a favoritos',
                             duration: const Duration(seconds: 1),
                           );
+                          
+                          // Notificar cambios globales para que Home y Favorites se refresquen
+                          context.read<DestinoUpdateNotifier>().notify();
+                          if (session.user != null && context.mounted) {
+                            context.read<FavoritoProvider>().refreshDestinosFavoritos(session.user!.uid);
+                          }
                         } catch (e) {
                           if (!context.mounted) return;
                           SnackBarService.mostrarError(context, e);
@@ -392,7 +441,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                 fit: StackFit.expand,
                 children: [
                   Image.network(
-                    widget.destino.imagenUrl,
+                    _destino.imagenUrl,
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
@@ -434,7 +483,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                       ),
                     ),
                   ),
-                  if (widget.destino.categoria.isNotEmpty)
+                  if (_destino.categoria.isNotEmpty)
                     Positioned(
                       left: 16,
                       bottom: 14,
@@ -445,7 +494,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Text(
-                          categoriaLabels[widget.destino.categoria] ?? widget.destino.categoria,
+                          categoriaLabels[_destino.categoria] ?? _destino.categoria,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 11,
@@ -466,7 +515,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.destino.nombre,
+                    _destino.nombre,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22),
                   ),
                   const SizedBox(height: 6),
@@ -475,21 +524,21 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                       const Icon(Icons.location_on_rounded, size: 17, color: AppColors.musgo),
                       const SizedBox(width: 4),
                       Text(
-                        widget.destino.provincia,
+                        _destino.provincia,
                         style: const TextStyle(fontSize: 14, color: AppColors.musgo),
                       ),
                     ],
                   ),
 
-                  if (widget.destino.nombreCreador != null &&
-                      widget.destino.nombreCreador!.isNotEmpty) ...[
+                  if (_destino.nombreCreador != null &&
+                      _destino.nombreCreador!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(Icons.person_rounded, size: 15, color: AppColors.musgoClaro),
                         const SizedBox(width: 4),
                         Text(
-                          'Creado por ${widget.destino.nombreCreador}',
+                          'Creado por ${_destino.nombreCreador}',
                           style: const TextStyle(fontSize: 12.5, color: AppColors.musgoClaro),
                         ),
                       ],
@@ -497,7 +546,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                   ],
 
                   // Descripción
-                  if (widget.destino.descripcion.isNotEmpty) ...[
+                  if (_destino.descripcion.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,7 +558,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            widget.destino.descripcion,
+                            _destino.descripcion,
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.musgo,
@@ -536,7 +585,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                         onTap: _mostrarOpcionesMapa,
                         child: FlutterMap(
                           options: MapOptions(
-                            initialCenter: LatLng(widget.destino.latitud, widget.destino.longitud),
+                            initialCenter: LatLng(_destino.latitud, _destino.longitud),
                             initialZoom: 14,
                             interactionOptions: const InteractionOptions(
                               flags: InteractiveFlag.all,
@@ -550,7 +599,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                             MarkerLayer(
                               markers: [
                                 Marker(
-                                  point: LatLng(widget.destino.latitud, widget.destino.longitud),
+                                  point: LatLng(_destino.latitud, _destino.longitud),
                                   width: 40,
                                   height: 40,
                                   child: const Icon(
@@ -602,7 +651,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
 
                   const SizedBox(height: 20),
 
-                  ClimaResumen(destino: widget.destino),
+                  ClimaResumen(destino: _destino),
 
                   const SizedBox(height: 14),
 
@@ -880,7 +929,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
                         try {
                           await _visitaProvider.deleteVisita(
                             visita.id,
-                            widget.destino.id,
+                            _destino.id,
                           );
                           if (!mounted) return;
                           SnackBarService.mostrarExito(context, 'Reseña eliminada');
@@ -899,6 +948,7 @@ class _DestinoDetailScreenState extends State<DestinoDetailScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
+      ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/session_provider.dart';
 import 'providers/favorito_provider.dart';
 import 'providers/visita_provider.dart';
+import 'providers/destino_update_notifier.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -27,6 +28,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => SessionProvider()),
         ChangeNotifierProvider(create: (_) => FavoritoProvider()),
         ChangeNotifierProvider(create: (_) => VisitaProvider()),
+        ChangeNotifierProvider(create: (_) => DestinoUpdateNotifier()),
       ],
       child: const MainApp(),
     ),

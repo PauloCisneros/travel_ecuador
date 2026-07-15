@@ -4,7 +4,6 @@ import '../models/destino_model.dart';
 import '../models/categorias_destino.dart';
 import '../providers/favorito_provider.dart';
 import '../providers/session_provider.dart';
-import '../screens/destino_detail_screen.dart';
 import '../services/snackbar_service.dart';
 import '../theme/app_theme.dart';
 import 'clima_resumen.dart';
@@ -13,12 +12,14 @@ class DestinoCard extends StatelessWidget {
   final Destino destino;
   final bool showFavoriteButton;
   final double? distanciaKm;
+  final VoidCallback? onTap;
 
   const DestinoCard({
     super.key,
     required this.destino,
     this.showFavoriteButton = true,
     this.distanciaKm,
+    this.onTap,
   });
 
   @override
@@ -28,14 +29,7 @@ class DestinoCard extends StatelessWidget {
     final isFavorito = favoritoProvider.isFavorito(destino.id);
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DestinoDetailScreen(destino: destino),
-          ),
-        );
-      },
+      onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(

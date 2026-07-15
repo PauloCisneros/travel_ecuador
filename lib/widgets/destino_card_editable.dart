@@ -14,12 +14,14 @@ class DestinoCardEditable extends StatelessWidget {
   final Destino destino;
   final VoidCallback onDelete;
   final VoidCallback onUpdate;
+  final VoidCallback? onGlobalUpdate;
 
   const DestinoCardEditable({
     super.key,
     required this.destino,
     required this.onDelete,
     required this.onUpdate,
+    this.onGlobalUpdate,
   });
 
   @override
@@ -29,13 +31,17 @@ class DestinoCardEditable extends StatelessWidget {
     final isFavorito = favoritoProvider.isFavorito(destino.id);
 
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
             builder: (context) => DestinoDetailScreen(destino: destino),
           ),
         );
+        if (result == true) {
+          onUpdate();
+          onGlobalUpdate?.call();
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -165,19 +171,20 @@ class DestinoCardEditable extends StatelessWidget {
                             color: Colors.white,
                             size: 20,
                           ),
-                          onPressed: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AddDestinoScreen(
-                                  destinoToEdit: destino,
-                                ),
-                              ),
-                            );
-                            if (result == true) {
-                              onUpdate();
-                            }
-                          },
+onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddDestinoScreen(
+                              destinoToEdit: destino,
+                            ),
+                          ),
+                        );
+                        if (result == true) {
+                          onUpdate();
+                          onGlobalUpdate?.call();
+                        }
+                      },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -218,6 +225,7 @@ class DestinoCardEditable extends StatelessWidget {
                             );
                             if (confirm == true) {
                               onDelete();
+                              onGlobalUpdate?.call();
                             }
                           },
                         ),

@@ -188,6 +188,11 @@ class SnackBarService {
       return 'La operación tardó demasiado. Intenta de nuevo.';
     }
 
+    // Errores de geocodificación
+    if (mensaje.contains('ubicación') || mensaje.contains('encontró')) {
+      return 'No se encontró la ubicación. Verifica el nombre y la provincia.';
+    }
+
     return 'Ha ocurrido un error. Intenta de nuevo.';
   }
 }

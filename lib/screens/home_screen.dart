@@ -9,10 +9,12 @@ import '../models/categorias_destino.dart';
 import '../models/provincias_ec.dart';
 import '../providers/session_provider.dart';
 import '../providers/favorito_provider.dart';
+import '../providers/destino_update_notifier.dart';
 
 import '../widgets/destino_card.dart';
 import '../widgets/destino_osm_card.dart';
 import 'add_destino_screen.dart';
+import 'destino_detail_screen.dart';
 import '../services/snackbar_service.dart';
 import '../services/gps_service.dart';
 import '../services/overpass_service.dart';
@@ -257,10 +259,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _navegarADetalle(Destino destino) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DestinoDetailScreen(destino: destino),
+      ),
+    );
+    if (result == true && mounted) {
+      _cargarDestinos();
+    }
+  }
+
   void _abrirChatbot() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ChatbotScreen()),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const ChatbotScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 250),
+      ),
     );
   }
 
@@ -422,14 +443,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SizedBox(
-            height: 125,
+            height: 155,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.only(left: 16),
               itemCount: _sitiosOsm.length,
               separatorBuilder: (_, _) => const SizedBox(width: 0),
               itemBuilder: (context, index) =>
-                  DestinoOsmCard(sitio: _sitiosOsm[index]),
+                  DestinoOsmCard(
+                    sitio: _sitiosOsm[index],
+                    onDestinoAgregado: () => _cargarDestinos(),
+                  ),
             ),
           ),
         ],
@@ -525,10 +549,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  int _lastDestinoVersion = -1;
+
   @override
   Widget build(BuildContext context) {
     final filtrados = _destinosFiltrados;
     final hayFiltrosExtra = _provinciaFiltro != null || _minRating > 0;
+
+    final destinoVersion = context.watch<DestinoUpdateNotifier>().version;
+    if (destinoVersion != _lastDestinoVersion) {
+      _lastDestinoVersion = destinoVersion;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _cargarDestinos();
+      });
+    }
+
+    context.watch<FavoritoProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.lienzo,
@@ -721,6 +757,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               destino: filtrados[index],
                               showFavoriteButton: true,
                               distanciaKm: _distancias[filtrados[index].id],
+                              onTap: () => _navegarADetalle(filtrados[index]),
                             ),
                             childCount: filtrados.length,
                           ),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/geocoding_service.dart';
@@ -9,6 +9,7 @@ import '../services/weather_service.dart';
 import '../services/storage_service.dart';
 import '../services/auth_service.dart';
 import '../services/snackbar_service.dart';
+import '../services/gps_service.dart';
 import '../models/destino_model.dart';
 import '../models/provincias_ec.dart';
 import '../models/categorias_destino.dart';
@@ -37,6 +38,8 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _descripcionController = TextEditingController();
+  final _latitudController = TextEditingController();
+  final _longitudController = TextEditingController();
 
   File? _imagenFile;
   Uint8List? _imagenBytes;
@@ -73,6 +76,8 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       _descripcionController.text = destino.descripcion;
       _latitud = destino.latitud;
       _longitud = destino.longitud;
+      _latitudController.text = destino.latitud.toStringAsFixed(6);
+      _longitudController.text = destino.longitud.toStringAsFixed(6);
       _clima = destino.clima;
       _temperatura = destino.temperatura;
       _humedad = destino.humedad;
@@ -81,6 +86,12 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       _nombreController.text = widget.nombrePrellenado!;
       _latitud = widget.latPrellenado;
       _longitud = widget.lngPrellenado;
+      if (widget.latPrellenado != null) {
+        _latitudController.text = widget.latPrellenado!.toStringAsFixed(6);
+      }
+      if (widget.lngPrellenado != null) {
+        _longitudController.text = widget.lngPrellenado!.toStringAsFixed(6);
+      }
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,8 +106,23 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
   void dispose() {
     _nombreController.dispose();
     _descripcionController.dispose();
+    _latitudController.dispose();
+    _longitudController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
+  }
+
+  bool _nombrePareceValido(String nombre) {
+    final n = nombre.trim();
+    if (n.length < 3) return false;
+    // Rechazar solo letras aleatorias repetidas (ej: "asda", "zzad", "hola")
+    if (RegExp(r'^(.)\1{2,}$').hasMatch(n.replaceAll(' ', ''))) return false;
+    // Rechazar si no tiene al menos 2 vocales (nombres reales suelen tenerlas)
+    final vocales = n.toLowerCase().replaceAll(RegExp(r'[^aeiouáéíóúü]'), '');
+    if (vocales.length < 2) return false;
+    // Rechazar si es solo consonantes o patrones de teclado
+    if (RegExp(r'^[bcdfghjklmnpqrstvwxyz]{4,}$', caseSensitive: false).hasMatch(n.replaceAll(' ', ''))) return false;
+    return true;
   }
 
   Future<void> _obtenerUbicacionYClima() async {
@@ -109,6 +135,12 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       return;
     }
 
+    if (!_nombrePareceValido(nombre)) {
+      SnackBarService.mostrarAdvertencia(
+          context, 'El nombre del lugar no parece válido. Ingresa un nombre real de lugar turístico.');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -116,6 +148,8 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       final result = await geocodingService.geocode(nombre, provincia);
       _latitud = result['lat'] as double;
       _longitud = result['lon'] as double;
+      _latitudController.text = _latitud!.toStringAsFixed(6);
+      _longitudController.text = _longitud!.toStringAsFixed(6);
       _ubicacionEncontrada = result['nombre_ubicacion'] as String?;
 
       if (!mounted) return;
@@ -130,6 +164,7 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
       SnackBarService.mostrarExito(
           context, 'Ubicación encontrada: $_ubicacionEncontrada');
     } catch (e) {
+      debugPrint('Geocoding error: $e');
       if (!mounted) return;
       SnackBarService.mostrarError(context, e);
     } finally {
@@ -151,8 +186,10 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
         _temperatura = weatherData['temperatura'];
         _humedad = weatherData['humedad'];
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      SnackBarService.mostrarAdvertencia(context,
+          'No se pudo obtener el clima. Los datos se guardarán sin información climática.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -165,10 +202,50 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
     });
   }
 
+  void _autoObtenerSoloClima() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+      _obtenerSoloClima();
+    });
+  }
+
+  Future<void> _usarMiUbicacion() async {
+    setState(() => _isLoading = true);
+    try {
+      final gps = GpsService();
+      final pos = await gps.getCurrentLocation();
+      _latitud = pos.latitude;
+      _longitud = pos.longitude;
+      _latitudController.text = _latitud!.toStringAsFixed(6);
+      _longitudController.text = _longitud!.toStringAsFixed(6);
+
+      final weatherService = WeatherService();
+      final weatherData = await weatherService.getWeather(_latitud!, _longitud!);
+      if (!mounted) return;
+      setState(() {
+        _clima = weatherData['clima'];
+        _temperatura = weatherData['temperatura'];
+        _humedad = weatherData['humedad'];
+      });
+
+      if (!mounted) return;
+      SnackBarService.mostrarExito(context, 'Ubicación actual obtenida correctamente');
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarService.mostrarError(context, e);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _dispararSiCompleto() {
     final nombre = _nombreController.text.trim();
     if (nombre.isNotEmpty && _provinciaSeleccionada != null && _provinciaSeleccionada!.isNotEmpty) {
-      _autoObtenerUbicacionYClima();
+      if (_latitud != null && _longitud != null) {
+        _autoObtenerSoloClima();
+      } else {
+        _autoObtenerUbicacionYClima();
+      }
     }
   }
 
@@ -438,6 +515,31 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
             const SizedBox(height: 28),
             _sectionLabel('Ubicación y clima'),
             const SizedBox(height: 10),
+
+            // Búsqueda automática por nombre + botón "Usar mi ubicación"
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoading ? null : _obtenerUbicacionYClima,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.sol),
+                          )
+                        : const Icon(Icons.search_rounded, size: 18),
+                    label: const Text('Buscar ubicación'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _GpsButton(
+                    enabled: !_isLoading && _latitud == null,
+                    onPressed: _usarMiUbicacion,
+                  ),
+                ),
+              ],
+            ),
             if (_isLoading && _latitud == null)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 6),
@@ -455,6 +557,45 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
                   ],
                 ),
               ),
+
+            const SizedBox(height: 14),
+
+            // Coordenadas manuales (siempre visibles como fallback)
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _latitudController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Latitud (manual)',
+                      prefixIcon: Icon(Icons.explore_outlined, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (v) {
+                      final parsed = double.tryParse(v);
+                      if (parsed != null) _latitud = parsed;
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _longitudController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Longitud (manual)',
+                      prefixIcon: Icon(Icons.explore_outlined, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (v) {
+                      final parsed = double.tryParse(v);
+                      if (parsed != null) _longitud = parsed;
+                    },
+                  ),
+                ),
+              ],
+            ),
 
             if (_latitud != null) ...[
               const SizedBox(height: 14),
@@ -696,6 +837,36 @@ class _AddDestinoScreenState extends State<AddDestinoScreen> {
           style: const TextStyle(fontSize: 11, color: AppColors.musgoClaro),
         ),
       ],
+    );
+  }
+}
+
+/// Botón GPS centrado que funciona bien en Row con Expanded
+class _GpsButton extends StatelessWidget {
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _GpsButton({required this.enabled, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: enabled ? onPressed : null,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.sol,
+        side: const BorderSide(color: AppColors.sol),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.my_location_rounded, size: 18),
+          const SizedBox(width: 8),
+          const Text('Usar mi ubicación', textAlign: TextAlign.center),
+        ],
+      ),
     );
   }
 }

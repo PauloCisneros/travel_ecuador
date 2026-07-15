@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/session_provider.dart';
 import '../providers/favorito_provider.dart';
+import '../providers/destino_update_notifier.dart';
 import '../models/destino_model.dart';
 import '../widgets/destino_card_editable.dart';
 import '../screens/add_destino_screen.dart';
@@ -13,6 +14,7 @@ import '../screens/destino_detail_screen.dart';
 import '../services/visita_service.dart';
 import '../services/storage_service.dart';
 import '../services/snackbar_service.dart';
+import '../utils/dashboard_cache.dart';
 import '../theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -27,8 +29,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController nombreController = TextEditingController();
   List<Destino> _misDestinos = [];
   bool _cargandoDestinos = false;
-  Map<String, int> _resumenResenas = {};
   bool _cargandoAvatar = false;
+  DateTime? _ultimaCarga;
+
+  // Dashboard states
+  DashboardStats? _dashboardStats;
+  bool _cargandoEstadisticas = false;
+  bool _statsError = false;
+  String? _categoriaFiltroLocal;
+  String? _provinciaFiltroLocal;
 
   @override
   void initState() {
@@ -36,8 +45,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final session = context.read<SessionProvider>();
     if (session.user != null) {
       nombreController.text = session.user!.nombre;
+      _cargarEstadisticas();
+      _cargarMisDestinos();
     }
-    _cargarMisDestinos();
   }
 
   @override
@@ -64,20 +74,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       List<Destino> destinos =
           response.map((map) => Destino.fromMap(map)).toList();
 
-      final visitaService = VisitaService();
-      if (destinos.isNotEmpty) {
-        final destinoIds = destinos.map((d) => d.id).toList();
-        _resumenResenas =
-            await visitaService.getResumenCalificacionesForDestinos(destinoIds);
-      } else {
-        _resumenResenas = {
-          'positivas': 0,
-          'neutras': 0,
-          'negativas': 0,
-          'total': 0,
-        };
-      }
-
       setState(() {
         _misDestinos = destinos;
       });
@@ -86,6 +82,445 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _cargandoDestinos = false);
     }
+  }
+
+  Future<void> _cargarEstadisticas({bool forceRefresh = false}) async {
+    final session = context.read<SessionProvider>();
+    if (session.user == null) return;
+
+    if (!forceRefresh) {
+      final cached = await DashboardCache.get(session.user!.uid);
+      if (cached != null && mounted) {
+        setState(() => _dashboardStats = cached);
+      }
+    }
+
+    setState(() => _cargandoEstadisticas = true);
+
+    try {
+      final visitaService = VisitaService();
+      final stats = await visitaService.getEstadisticasDetalladasParaUsuario(session.user!.uid);
+      await DashboardCache.save(session.user!.uid, stats);
+      if (mounted) {
+        setState(() {
+          _dashboardStats = stats;
+          _statsError = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _statsError = true);
+    } finally {
+      if (mounted) setState(() => _cargandoEstadisticas = false);
+    }
+  }
+
+  Future<void> _refreshDashboard() async {
+    final session = context.read<SessionProvider>();
+    if (session.user != null) {
+      await DashboardCache.invalidate(session.user!.uid);
+      await Future.wait([
+        _cargarMisDestinos(),
+        _cargarEstadisticas(forceRefresh: true),
+      ]);
+    }
+  }
+
+  Future<void> _onDestinoChanged() async {
+    final session = context.read<SessionProvider>();
+    if (session.user != null) {
+      await DashboardCache.invalidate(session.user!.uid);
+      await Future.wait([
+        _cargarMisDestinos(),
+        _cargarEstadisticas(forceRefresh: true),
+      ]);
+      // Notificar a Home y Favorites para que se refresquen automáticamente
+      context.read<DestinoUpdateNotifier>().notify();
+      context.read<FavoritoProvider>().refreshDestinosFavoritos(session.user!.uid);
+    }
+  }
+
+  // ========== DASHBOARD HELPER METHODS ==========
+
+  Widget _buildDashboard() {
+    if (_cargandoEstadisticas && _dashboardStats == null) {
+      return _buildDashboardSkeleton();
+    }
+
+    if (_statsError && _dashboardStats == null) {
+      return _DashboardEmptyState(
+        type: 'error',
+        onRetry: _refreshDashboard,
+      );
+    }
+
+    if (_dashboardStats == null) {
+      return _DashboardEmptyState(
+        type: 'zeroDestinos',
+        onCrearDestino: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AddDestinoScreen()),
+        ),
+        onExplorar: () => _switchToHomeTab(),
+      );
+    }
+
+    final stats = _dashboardStats!;
+    final isTablet = MediaQuery.of(context).size.width >= 600;
+    final maxReviews = isTablet ? 5 : 3;
+
+    if (stats.totalDestinos == 0) {
+      return _DashboardEmptyState(
+        type: 'zeroDestinos',
+        onCrearDestino: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AddDestinoScreen()),
+        ),
+        onExplorar: () => _switchToHomeTab(),
+      );
+    }
+
+    if (stats.totalResenas == 0) {
+      return _DashboardEmptyState(
+        type: 'zeroResenas',
+        onVerDestinos: _scrollToMisDestinos,
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.niebla),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Dashboard',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.tinta,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Stat Cards
+          Row(
+            children: [
+              _MetricCard(
+                icon: Icons.place_rounded,
+                value: stats.totalDestinos.toString(),
+                label: 'Destinos',
+                color: AppColors.sol,
+              ),
+              const SizedBox(width: 12),
+              _MetricCard(
+                icon: Icons.star_rounded,
+                value: stats.totalResenas.toString(),
+                label: 'Reseñas',
+                color: AppColors.solOscuro,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Promedio Global + Distribución Estrellas
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Promedio Global Card
+              Expanded(
+                flex: 2,
+                child: _PromedioGlobalCard(
+                  promedio: stats.promedioGlobal,
+                  totalResenas: stats.totalResenas,
+                ),
+              ),
+              const SizedBox(width: 20),
+              // Distribución de Estrellas
+              Expanded(
+                flex: 3,
+                child: _StarDistributionBars(
+                  distribucion: stats.distribucionEstrellas,
+                  total: stats.totalResenas,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Top Categorías
+          if (stats.topCategorias.isNotEmpty) ...[
+            _TopCategoryChips(
+              title: 'Categorías',
+              icon: Icons.category_outlined,
+              items: stats.topCategorias,
+              onTap: _filtrarCategoria,
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Top Provincias
+          if (stats.topProvincias.isNotEmpty) ...[
+            _TopCategoryChips(
+              title: 'Provincias',
+              icon: Icons.location_city_outlined,
+              items: stats.topProvincias,
+              onTap: _filtrarProvincia,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Reseñas Recientes
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Reseñas recientes',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.tinta,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...stats.resenasRecientes.take(maxReviews).map((r) => _RecentReviewTile(
+                review: r,
+                onTap: () => _navigateToDestinoDetail(r['destinoId'] as String),
+              )),
+        ],
+      ),
+    );
+  }
+
+  void _filtrarCategoria(String categoria) {
+    setState(() {
+      _categoriaFiltroLocal = _categoriaFiltroLocal == categoria ? null : categoria;
+    });
+  }
+
+  void _filtrarProvincia(String provincia) {
+    setState(() {
+      _provinciaFiltroLocal = _provinciaFiltroLocal == provincia ? null : provincia;
+    });
+  }
+
+  void _scrollToMisDestinos() {
+    // The list is in the same scroll view, so it will be visible
+  }
+
+  void _switchToHomeTab() {
+    SnackBarService.mostrarAdvertencia(context, 'Usa la navegación inferior para ir a Inicio');
+  }
+
+  Future<void> _navigateToDestinoDetail(String destinoId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('destinos')
+          .select()
+          .eq('id', destinoId)
+          .maybeSingle();
+
+      if (response == null) {
+        if (!mounted) return;
+        SnackBarService.mostrarError(context, 'Destino no encontrado');
+        return;
+      }
+
+      // Fetch creator name
+      final creatorUid = response['uid'] as String;
+      String creatorName = 'Usuario';
+      final userResponse = await supabase
+          .from('users')
+          .select('nombre')
+          .eq('uid', creatorUid)
+          .maybeSingle();
+      if (userResponse != null) {
+        creatorName = userResponse['nombre'] ?? 'Usuario';
+      }
+
+      final destinoMap = Map<String, dynamic>.from(response);
+      destinoMap['nombre_creador'] = creatorName;
+
+      final destino = Destino.fromMap(destinoMap);
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DestinoDetailScreen(destino: destino),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarService.mostrarError(context, e);
+    }
+  }
+
+  Widget _buildMisDestinosSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Mis destinos',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.tinta,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.add_circle_rounded),
+              color: AppColors.sol,
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddDestinoScreen(),
+                  ),
+                );
+                if (result == true) {
+                  await _onDestinoChanged();
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              color: AppColors.musgo,
+              onPressed: _refreshDashboard,
+            ),
+          ],
+        ),
+
+        // Removido SizedBox(height: 4) para reducir separación
+
+        if (_cargandoDestinos)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_misDestinos.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.niebla),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.solClaro,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.travel_explore_rounded,
+                    color: AppColors.sol,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No has agregado destinos aún',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.tinta,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Usa el botón + para crear tu primer destino.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.musgo,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _misDestinos.length,
+            itemBuilder: (context, index) {
+              final destino = _misDestinos[index];
+              return DestinoCardEditable(
+                destino: destino,
+                onDelete: () => _eliminarDestino(destino.id),
+                onUpdate: _onDestinoChanged,
+                onGlobalUpdate: _onDestinoChanged,
+              );
+            },
+          ),
+
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildDashboardSkeleton() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.niebla),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonLine(width: 100, height: 24),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _SkeletonCard(),
+              const SizedBox(width: 12),
+              _SkeletonCard(),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: _SkeletonBox(width: 140, height: 130)),
+              const SizedBox(width: 20),
+              Expanded(flex: 3, child: _SkeletonBox(width: 200, height: 130)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SkeletonLine(width: double.infinity, height: 40),
+          const SizedBox(height: 12),
+          _SkeletonLine(width: double.infinity, height: 40),
+          const SizedBox(height: 16),
+          _SkeletonLine(width: 120, height: 20),
+          const SizedBox(height: 8),
+          ...List.generate(3, (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _SkeletonLine(width: double.infinity, height: 56),
+          )),
+        ],
+      ),
+    );
   }
 
   Future<void> _eliminarDestino(String destinoId) async {
@@ -104,6 +539,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
 
       if (mounted) SnackBarService.mostrarExito(context, 'Destino eliminado');
+      await _onDestinoChanged();
     } catch (e) {
       if (mounted) SnackBarService.mostrarError(context, e);
     }
@@ -241,41 +677,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Destino? _mejorValorado() {
-    final conResenas = _misDestinos
-        .where((d) => (d.totalCalificaciones ?? 0) > 0)
-        .toList();
-    if (conResenas.isEmpty) return null;
-    conResenas.sort((a, b) =>
-        (b.promedioCalificacion ?? 0).compareTo(a.promedioCalificacion ?? 0));
-    return conResenas.first;
-  }
-
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionProvider>();
     final user = session.user;
 
+    final ahora = DateTime.now();
+    if (user != null &&
+        (_ultimaCarga == null ||
+            ahora.difference(_ultimaCarga!) > const Duration(seconds: 3))) {
+      _ultimaCarga = ahora;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_cargandoDestinos) _cargarMisDestinos();
+      });
+    }
+
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final total = _resumenResenas['total'] ?? 0;
-    final positivas = _resumenResenas['positivas'] ?? 0;
-    final neutras = _resumenResenas['neutras'] ?? 0;
-    final negativas = _resumenResenas['negativas'] ?? 0;
-    final mejorDestino = _mejorValorado();
     final esExplorador = _misDestinos.length >= 3;
 
     return Stack(
       children: [
-        SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 56, 16, 16),
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ========== HEADER ==========
-          Center(
+        RefreshIndicator(
+          onRefresh: _refreshDashboard,
+          color: AppColors.sol,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 56, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ========== HEADER ==========
+                Center(
             child: Column(
               children: [
                 Stack(
@@ -334,6 +769,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
+                    // Botón cerrar sesión en la esquina superior derecha del avatar
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: Material(
+                        color: Colors.white,
+                        shape: const CircleBorder(),
+                        clipBehavior: Clip.antiAlias,
+                        elevation: 2,
+                        shadowColor: Colors.black26,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _confirmarLogout,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.logout_rounded,
+                              color: AppColors.musgo,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -364,6 +825,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Icons.edit_rounded,
                             size: 18,
                             color: AppColors.musgoClaro,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: _confirmarLogout,
+                        borderRadius: BorderRadius.circular(99),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.logout_rounded,
+                            size: 20,
+                            color: AppColors.musgo,
                           ),
                         ),
                       ),
@@ -468,337 +942,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
-          // ========== DASHBOARD ==========
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.niebla),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Dashboard',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.tinta,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _StatChip(
-                      icon: Icons.place_rounded,
-                      label: '${_misDestinos.length} destinos',
-                    ),
-                    const SizedBox(width: 12),
-                    _StatChip(
-                      icon: Icons.star_rounded,
-                      label: '$total reseñas',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                if (total > 0) ...[
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 130,
-                        height: 130,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CustomPaint(
-                              size: const Size(130, 130),
-                              painter: _DonutChartPainter(
-                                positivas: positivas,
-                                neutras: neutras,
-                                negativas: negativas,
-                              ),
-                            ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '$total',
-                                  style: const TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.tinta,
-                                  ),
-                                ),
-                                const Text(
-                                  'reseñas',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.musgo,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _LegendItem(
-                              color: AppColors.exito,
-                              label: 'Positivas',
-                              value: positivas,
-                              total: total,
-                            ),
-                            const SizedBox(height: 6),
-                            _LegendItem(
-                              color: AppColors.musgoClaro,
-                              label: 'Neutras',
-                              value: neutras,
-                              total: total,
-                            ),
-                            const SizedBox(height: 6),
-                            _LegendItem(
-                              color: AppColors.error,
-                              label: 'Negativas',
-                              value: negativas,
-                              total: total,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  if (mejorDestino != null)
-                    InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DestinoDetailScreen(
-                              destino: mejorDestino,
-                            ),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.emoji_events_rounded,
-                              color: AppColors.sol,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Mejor valorado: ${mejorDestino.nombre} '
-                                '(${(mejorDestino.promedioCalificacion ?? 0).toStringAsFixed(1)}★)',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.tinta,
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.chevron_right,
-                              color: AppColors.musgoClaro,
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                ] else ...[
-                  Center(
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.solClaro,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.bar_chart_rounded,
-                            color: AppColors.sol,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Aún no tienes reseñas',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.tinta,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Las estadísticas aparecerán cuando\ntus destinos reciban reseñas.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.musgo,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ========== MIS DESTINOS ==========
-          Row(
-            children: [
-              const Text(
-                'Mis destinos',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.tinta,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.add_circle_rounded),
-                color: AppColors.sol,
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddDestinoScreen(),
-                    ),
-                  );
-                  if (result == true) {
-                    _cargarMisDestinos();
-                  }
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                color: AppColors.musgo,
-                onPressed: _cargarMisDestinos,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 4),
-
-          if (_cargandoDestinos)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_misDestinos.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.niebla),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: AppColors.solClaro,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.travel_explore_rounded,
-                      color: AppColors.sol,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No has agregado destinos aún',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.tinta,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Usa el botón + para crear tu primer destino.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.musgo,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _misDestinos.length,
-              itemBuilder: (context, index) {
-                final destino = _misDestinos[index];
-                return DestinoCardEditable(
-                  destino: destino,
-                  onDelete: () => _eliminarDestino(destino.id),
-                  onUpdate: _cargarMisDestinos,
-                );
-              },
-            ),
+          // ========== DASHBOARD + MIS DESTINOS (single scroll with pull-to-refresh) ==========
+          _buildDashboard(),
+          const SizedBox(height: 8),
+          _buildMisDestinosSection(),
 
           const SizedBox(height: 40),
         ],
       ),
     ),
-    Positioned(
-      top: 90,
-      right: 8,
-      child: Material(
-        color: Colors.white,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        elevation: 2,
-        shadowColor: Colors.black26,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: _confirmarLogout,
-          child: Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.logout_rounded,
-              color: AppColors.musgo,
-              size: 22,
-            ),
-          ),
-        ),
-      ),
     ),
   ],
 );
@@ -808,55 +962,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 // ====================================================================
 //  HELPER WIDGETS
 // ====================================================================
-
-class _DonutChartPainter extends CustomPainter {
-  final int positivas, neutras, negativas;
-
-  _DonutChartPainter({
-    required this.positivas,
-    required this.neutras,
-    required this.negativas,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final total = positivas + neutras + negativas;
-    if (total == 0) return;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    const strokeWidth = 18.0;
-    final rect = Rect.fromCircle(
-      center: center,
-      radius: radius - strokeWidth / 2,
-    );
-
-    double startAngle = -3.14159 / 2;
-
-    void drawSegment(int value, Color color) {
-      if (value == 0) return;
-      final sweep = 2 * 3.14159 * (value / total);
-      final paint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.butt;
-      canvas.drawArc(rect, startAngle, sweep, false, paint);
-      startAngle += sweep;
-    }
-
-    drawSegment(positivas, AppColors.exito);
-    drawSegment(neutras, AppColors.musgoClaro);
-    drawSegment(negativas, AppColors.error);
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutChartPainter oldDelegate) {
-    return oldDelegate.positivas != positivas ||
-        oldDelegate.neutras != neutras ||
-        oldDelegate.negativas != negativas;
-  }
-}
 
 class _FotoOptionTile extends StatelessWidget {
   final IconData icon;
@@ -890,32 +995,123 @@ class _FotoOptionTile extends StatelessWidget {
   }
 }
 
-class _StatChip extends StatelessWidget {
+/// Metric card for dashboard
+class _MetricCard extends StatelessWidget {
   final IconData icon;
+  final String value;
   final String label;
+  final Color color;
 
-  const _StatChip({required this.icon, required this.label});
+  const _MetricCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.lienzoAlterno,
-        borderRadius: BorderRadius.circular(12),
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.niebla),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: AppColors.tinta,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.musgo,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
+    );
+  }
+}
+
+/// Promedio global card
+class _PromedioGlobalCard extends StatelessWidget {
+  final double promedio;
+  final int totalResenas;
+
+  const _PromedioGlobalCard({
+    required this.promedio,
+    required this.totalResenas,
+  });
+
+  Color _getColor() {
+    if (promedio >= 4.0) return AppColors.exito;
+    if (promedio >= 3.0) return AppColors.sol;
+    return AppColors.error;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _getColor();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.musgo),
-          const SizedBox(width: 6),
           Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
+            'Promedio',
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
               fontWeight: FontWeight.w600,
-              color: AppColors.tinta,
             ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            promedio.toStringAsFixed(1),
+            style: TextStyle(
+              fontSize: 48,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                '$totalResenas reseñas',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.musgo,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -923,50 +1119,550 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String label;
-  final int value;
+/// Star distribution bars
+class _StarDistributionBars extends StatelessWidget {
+  final Map<int, int> distribucion;
   final int total;
 
-  const _LegendItem({
-    required this.color,
-    required this.label,
-    required this.value,
+  const _StarDistributionBars({
+    required this.distribucion,
     required this.total,
   });
 
   @override
   Widget build(BuildContext context) {
-    final percent = total > 0 ? (value / total * 100).round() : 0;
-    return Row(
+    final starColors = {
+      5: AppColors.exito,
+      4: AppColors.sol,
+      3: AppColors.musgoClaro,
+      2: AppColors.error,
+      1: AppColors.error.withValues(alpha: 0.6),
+    };
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        final star = 5 - index;
+        final count = distribucion[star] ?? 0;
+        final percent = total > 0 ? count / total : 0.0;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '$star★',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.musgo,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.niebla,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    FractionallySizedBox(
+                      widthFactor: percent,
+                      child: Container(
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: starColors[star] ?? AppColors.musgo,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 30,
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.tinta,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+}
+
+/// Top category/province chips
+class _TopCategoryChips extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Map<String, dynamic>> items;
+  final Function(String) onTap;
+
+  const _TopCategoryChips({
+    required this.title,
+    required this.icon,
+    required this.items,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+        Row(
+          children: [
+            Icon(icon, size: 16, color: AppColors.musgo),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.musgo,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.musgo,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          '$percent%',
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: AppColors.tinta,
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: items.map((item) {
+              final nombre = item['nombre'] as String;
+              final count = item['count'] as int;
+              final selected = false; // We don't persist selection in chips
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(nombre),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.solClaro,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.sol,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  selected: selected,
+                  onSelected: (_) => onTap(nombre),
+                  backgroundColor: Colors.white,
+                  selectedColor: AppColors.solClaro,
+                  checkmarkColor: AppColors.sol,
+                  side: BorderSide(color: AppColors.niebla),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  labelStyle: const TextStyle(fontSize: 12, color: AppColors.tinta),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              );
+            }).toList(),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Recent review tile
+class _RecentReviewTile extends StatelessWidget {
+  final Map<String, dynamic> review;
+  final VoidCallback onTap;
+
+  const _RecentReviewTile({
+    required this.review,
+    required this.onTap,
+  });
+
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inDays > 0) {
+        return 'Hace ${diff.inDays} día${diff.inDays > 1 ? 's' : ''}';
+      } else if (diff.inHours > 0) {
+        return 'Hace ${diff.inHours} hora${diff.inHours > 1 ? 's' : ''}';
+      } else if (diff.inMinutes > 0) {
+        return 'Hace ${diff.inMinutes} minuto${diff.inMinutes > 1 ? 's' : ''}';
+      } else {
+        return 'Hace un momento';
+      }
+    } catch (_) {
+      return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final calificacion = review['calificacion'] as int? ?? 0;
+    final comentario = review['comentario'] as String?;
+    final nombreUsuario = review['nombreUsuario'] as String? ?? 'Usuario';
+    final destinoNombre = review['destinoNombre'] as String? ?? 'Destino';
+    final createdAt = review['createdAt'] as String? ?? '';
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.niebla),
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: AppColors.solClaro,
+              child: Text(
+                nombreUsuario.isNotEmpty ? nombreUsuario[0].toUpperCase() : '?',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.solOscuro,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        nombreUsuario,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                          color: AppColors.tinta,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ...List.generate(5, (i) => Icon(
+                        i < calificacion ? Icons.star_rounded : Icons.star_border_rounded,
+                        color: Colors.amber,
+                        size: 13,
+                      )),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    destinoNombre,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.musgo,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (comentario != null && comentario.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      comentario,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.musgo,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(createdAt),
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppColors.musgoClaro,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.musgoClaro,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  final double width;
+  final double height;
+
+  const _SkeletonLine({required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.niebla,
+        borderRadius: BorderRadius.circular(4),
+      ),
+    );
+  }
+}
+
+class _SkeletonCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.niebla),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.niebla,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _SkeletonLine(width: 60, height: 28),
+            _SkeletonLine(width: 80, height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  final double width;
+  final double height;
+
+  const _SkeletonBox({required this.width, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.niebla,
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
+  }
+}
+
+/// Empty state for dashboard
+class _DashboardEmptyState extends StatelessWidget {
+  final String type; // 'zeroDestinos', 'zeroResenas', 'error'
+  final VoidCallback? onRetry;
+  final VoidCallback? onCrearDestino;
+  final VoidCallback? onExplorar;
+  final VoidCallback? onVerDestinos;
+
+  const _DashboardEmptyState({
+    required this.type,
+    this.onRetry,
+    this.onCrearDestino,
+    this.onExplorar,
+    this.onVerDestinos,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    String title;
+    String subtitle;
+    IconData icon;
+    Color iconColor;
+    List<Widget> actions = [];
+
+    switch (type) {
+      case 'zeroDestinos':
+        title = 'Tu aventura empieza aquí';
+        subtitle = 'Aún no has creado ningún destino.\nComparte tus lugares favoritos de Ecuador.';
+        icon = Icons.travel_explore_rounded;
+        iconColor = AppColors.sol;
+        actions = [
+          _EmptyAction(
+            label: 'Crear mi primer destino',
+            icon: Icons.add_rounded,
+            onTap: onCrearDestino ?? () {},
+            isPrimary: true,
+          ),
+          _EmptyAction(
+            label: 'Explorar destinos',
+            icon: Icons.explore_rounded,
+            onTap: onExplorar ?? () {},
+            isPrimary: false,
+          ),
+        ];
+        break;
+      case 'zeroResenas':
+        title = 'Sin reseñas aún';
+        subtitle = 'Tus destinos están esperando opiniones.\nCuando alguien los visite, aparecerán aquí.';
+        icon = Icons.star_border_rounded;
+        iconColor = AppColors.sol;
+        actions = [
+          _EmptyAction(
+            label: 'Ver mis destinos',
+            icon: Icons.place_rounded,
+            onTap: onVerDestinos ?? () {},
+            isPrimary: true,
+          ),
+        ];
+        break;
+      case 'error':
+      default:
+        title = 'No se pudo cargar';
+        subtitle = 'Ocurrió un error al cargar el dashboard.\nIntenta de nuevo.';
+        icon = Icons.error_outline_rounded;
+        iconColor = AppColors.error;
+        actions = [
+          _EmptyAction(
+            label: 'Reintentar',
+            icon: Icons.refresh_rounded,
+            onTap: onRetry ?? () {},
+            isPrimary: true,
+          ),
+        ];
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.niebla),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 40, color: iconColor),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.tinta,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.musgo,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ...actions,
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  const _EmptyAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.isPrimary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SizedBox(
+        width: double.infinity,
+        child: isPrimary
+            ? FilledButton.icon(
+                onPressed: onTap,
+                icon: Icon(icon, size: 18),
+                label: Text(label),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.sol,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              )
+            : OutlinedButton.icon(
+                onPressed: onTap,
+                icon: Icon(icon, size: 18),
+                label: Text(label),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.sol,
+                  side: const BorderSide(color: AppColors.sol),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+      ),
     );
   }
 }

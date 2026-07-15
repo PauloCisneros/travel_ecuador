@@ -22,6 +22,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   WebViewController _buildController() {
     return WebViewController()
+      ..setBackgroundColor(AppColors.lienzo)
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(

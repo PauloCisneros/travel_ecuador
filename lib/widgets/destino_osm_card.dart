@@ -5,8 +5,9 @@ import '../screens/add_destino_screen.dart';
 
 class DestinoOsmCard extends StatelessWidget {
   final SitioOsm sitio;
+  final VoidCallback? onDestinoAgregado;
 
-  const DestinoOsmCard({super.key, required this.sitio});
+  const DestinoOsmCard({super.key, required this.sitio, this.onDestinoAgregado});
 
   IconData _iconoTipo(String tipo) {
     switch (tipo) {
@@ -109,10 +110,10 @@ class DestinoOsmCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
             child: SizedBox(
               width: double.infinity,
-              height: 32,
+              height: 40,
               child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => AddDestinoScreen(
@@ -122,6 +123,9 @@ class DestinoOsmCard extends StatelessWidget {
                       ),
                     ),
                   );
+                  if (result == true && onDestinoAgregado != null) {
+                    onDestinoAgregado!();
+                  }
                 },
                 icon: const Icon(Icons.add_rounded, size: 15),
                 label: const Text('Agregar', style: TextStyle(fontSize: 12)),

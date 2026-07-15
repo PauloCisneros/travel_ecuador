@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/favorito_provider.dart';
 import '../providers/session_provider.dart';
+import '../providers/destino_update_notifier.dart';
 import '../models/destino_model.dart';
 import '../models/categorias_destino.dart';
 import '../widgets/destino_card.dart';
+import 'destino_detail_screen.dart';
 import '../services/snackbar_service.dart';
 import '../theme/app_theme.dart';
 
@@ -19,6 +21,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _categoriaFiltro;
+  bool _needsLoad = true;
+  String? _lastSessionUid;
 
   String _sinAcentos(String s) => s
       .toLowerCase()
@@ -45,7 +49,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _cargarFavoritos());
   }
 
   @override
@@ -56,19 +59,30 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _cargarFavoritos() async {
     final favoritoProvider = context.read<FavoritoProvider>();
-    if (favoritoProvider.isLoading) return;
 
     try {
       final session = context.read<SessionProvider>();
 
       if (session.user != null) {
         await favoritoProvider.loadDestinosFavoritos(session.user!.uid);
-        favoritoProvider.notify();
       }
     } catch (e) {
+      _needsLoad = true;
       if (mounted) {
         SnackBarService.mostrarError(context, e);
       }
+    }
+  }
+
+  Future<void> _navegarADetalle(Destino destino) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DestinoDetailScreen(destino: destino),
+      ),
+    );
+    if (result == true && mounted) {
+      _cargarFavoritos();
     }
   }
 
@@ -94,9 +108,39 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
+  int _ultimaModificacion = 0;
+  int _lastDestinoVersion = -1;
+
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<SessionProvider>();
+    final currentUid = session.user?.uid;
+
+    if (currentUid != null && (_needsLoad || _lastSessionUid != currentUid)) {
+      _needsLoad = false;
+      _lastSessionUid = currentUid;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _cargarFavoritos();
+      });
+    }
+
+    final destinoVersion = context.watch<DestinoUpdateNotifier>().version;
+    if (destinoVersion != _lastDestinoVersion) {
+      _lastDestinoVersion = destinoVersion;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _cargarFavoritos();
+      });
+    }
+
     final favoritoProvider = context.watch<FavoritoProvider>();
+    final version = favoritoProvider.ultimaModificacionDestinos;
+    if (version != _ultimaModificacion) {
+      _ultimaModificacion = version;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _cargarFavoritos();
+      });
+    }
+
     final destinos = favoritoProvider.destinosFavoritos;
     final filtrados = _destinosFiltrados;
 
@@ -186,6 +230,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                             (context, index) => DestinoCard(
                               destino: filtrados[index],
                               showFavoriteButton: true,
+                              onTap: () => _navegarADetalle(filtrados[index]),
                             ),
                             childCount: filtrados.length,
                           ),
