@@ -35,10 +35,10 @@
 
 <div align="center">
   <!-- Reemplaza con las rutas de tus capturas -->
-  <img src="capturas/splash_screem.jpeg" width="22%" alt="Splash Screen" />
   <img width="22%" alt="splash_screem" src="https://github.com/user-attachments/assets/252f0c6b-48dc-4d93-802f-bb323192ef44" />
 
-  <img src="capturas/login.jpeg" width="22%" alt="Autenticación" />
+  <img width="22%" alt="login" src="https://github.com/user-attachments/assets/ea7b1a79-8faf-449a-833f-06fd9431e7e9" />
+
   <img src="capturas/home.jpeg" width="22%" alt="Pantalla Principal" />
   <img src="capturas/detail_lugar.jpeg" width="22%" alt="Detalle del Destino" />
 </div>
