@@ -46,10 +46,12 @@
 </div>
 <br>
 <div align="center">
-  <img src="capturas/filtros.jpeg" width="22%" alt="Filtros" />
-  <img src="capturas/modo_cerca_de_mi.jpeg" width="22%" alt="Cerca de mí" />
-  <img src="capturas/perfil.jpeg" width="22%" alt="Perfil de Usuario" />
-  <img src="capturas/chatbot.jpeg" width="22%" alt="Asistente Virtual" />
+  <img width="22%" alt="filtros" src="https://github.com/user-attachments/assets/a7f561d3-b0b5-4988-b2f1-f33932209dbd" />
+  <img width="22%" alt="modo_cerca_de_mi" src="https://github.com/user-attachments/assets/38111718-950d-43c4-8b19-c5c524cba5ab" />
+  <img width="22%" alt="perfil" src="https://github.com/user-attachments/assets/d3ed41dc-a335-4887-aaae-47151551db32" />
+  <img width="22%" alt="chatbot" src="https://github.com/user-attachments/assets/2a3dc5fb-177e-4198-8288-50b0aad1686b" />
+
+
 </div>
 
 ### ✨ Funcionalidades Core
