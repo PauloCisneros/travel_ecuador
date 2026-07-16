@@ -14,13 +14,8 @@ Aplicación móvil Flutter para descubrir y compartir destinos turísticos en Ec
 | Estado | Provider + ChangeNotifier |
 | Backend | Supabase (Auth, Postgres, Storage) |
 | APIs externas | OpenWeatherMap (clima), Photon/OSM (geocodificación), Overpass API (OSM) |
-<<<<<<< HEAD
 | Almacenamiento local | SharedPreferences (legacy `favorito_service.dart` — no usado por providers) |
 | Mapas/Navegación | flutter_map (OSM), url_launcher (Google Maps, Waze) |
-=======
-| Almacenamiento local | SharedPreferences (favoritos) |
-| Mapas/Navegación | url_launcher (Google Maps, Waze) |
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
 | GPS | geolocator |
 | Chatbot | Botpress v3.6 webview embebido (EcuGuía) con JavaScript Bridge |
 
@@ -112,7 +107,6 @@ final visitaService = VisitaService();
 
 | Servicio | Backend / API | Propósito |
 |---|---|---|
-<<<<<<< HEAD
 | `AuthService` | Supabase Auth + `users` | Registro, login, logout, perfil, `syncUserProfile()` (crea perfil si falta) |
 | `FavoritoSupabaseService` | Supabase `favoritos` | CRUD de favoritos en base de datos |
 | `FavoritoService` (legacy) | SharedPreferences | CRUD local de favoritos (ya no usado por ningún provider) |
@@ -123,17 +117,6 @@ final visitaService = VisitaService();
 | `GpsService` | geolocator (GPS) | Ubicación actual del dispositivo, fallback a última conocida, timeout 15s |
 | `OverpassService` | Overpass API | Búsqueda sitios turísticos cercanos (tourism, radio 5km, POST con fallback GET, timeout 25s, top 10) |
 | `SnackbarService` | Flutter UI | Snackbars con mensajes amigables (`mostrarExito`, `mostrarAdvertencia`, `mostrarError`), traduce excepciones técnicas (Auth, Postgrest, Storage, Socket, Format, ubicación, clima, mapas, avatar upload/db, timeout, geocoding, cámara/galería) |
-=======
-| `AuthService` | Supabase Auth + `users` | Registro, login, logout, perfil (incluye `avatar_url`) |
-| `FavoritoService` | SharedPreferences | Persistencia local de favoritos |
-| `VisitaService` | Supabase `visitas` | CRUD de visitas/calificaciones con joins + resumen de calificaciones |
-| `StorageService` | Supabase Storage (`destinos`, `avatars`) | Subida/borrado de imágenes + avatar con upsert |
-| `WeatherService` | OpenWeatherMap API | Clima por coordenadas |
-| `GeocodingService` | Photon API (OSM) | Nombre de lugar → lat/lng |
-| `GpsService` | geolocator (GPS) | Ubicación actual del dispositivo |
-| `OverpassService` | Overpass API | Búsqueda de sitios turísticos cercanos (tourism, radio 5km) |
-| `SnackbarService` | Flutter UI | Snackbars con mensajes amigables (incluye detección de errores de avatar) |
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
 
 ---
 
@@ -173,11 +156,6 @@ final visitaService = VisitaService();
 - **Uso:** Búsqueda de lugares turísticos cercanos a una ubicación GPS.
 - **Detalles:** Consulta `node` y `way` con `tourism=attraction|museum|viewpoint|gallery` en radio de 5km. Usa `out body center` para obtener centroides de ways. POST con fallback GET, timeout 25s. Sin API key. Retorna top 10 ordenados por distancia.
 
-### Overpass API (OpenStreetMap)
-- **Endpoint:** `overpass-api.de/api/interpreter`
-- **Uso:** Búsqueda de lugares turísticos cercanos a una ubicación GPS.
-- **Detalles:** Consulta `node` y `way` con `tourism=attraction|museum|viewpoint|gallery` en radio de 5km. Usa `out body center` para obtener centroides de ways. POST con fallback GET, timeout 25s. Sin API key.
-
 ---
 
 ## 8. Navegación / Rutas
@@ -187,11 +165,7 @@ SplashScreen (animación 2.6s: ícono escala+resplandor, título slide, puntos p
   └── AuthGate (decide según SessionProvider.isLoggedIn)
        ├── LoginScreen (si no logueado)
        └── MainTabsScreen (IndexedStack — preserva estado entre tabs)
-<<<<<<< HEAD
             ├── [0] HomeScreen → DestinoDetailScreen / AddDestinoScreen / ChatbotScreen (push)
-=======
-            ├── [0] HomeScreen → DestinoDetailScreen / AddDestinoScreen
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
             ├── [1] FavoritesScreen → DestinoDetailScreen
             └── [2] ProfileScreen → AddDestinoScreen (editar) / DestinoDetailScreen
 ```
@@ -207,27 +181,16 @@ lib/
 ├── main.dart                     # Inicialización, MultiProvider, MainApp, SplashScreenWrapper, AuthGate, MainTabsScreen (IndexedStack + BottomNav 3 tabs)
 ├── splash_screen.dart            # Pantalla de carga animada (2.6s con secuencia icono→resplandor→título→puntos)
 ├── theme/
-<<<<<<< HEAD
 │   └── app_theme.dart            # Paleta AppColors (11 colores) + temas globales Material 3 (text, inputs, buttons, cards, FAB, chips, badges, snackbar, bottomNav, diálogos)
-=======
-│   └── app_theme.dart            # Paleta AppColors + temas globales (Material 3)
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
 ├── utils/
 │   └── distancia.dart            # Función Haversine para calcular km entre coordenadas
 ├── models/
 │   ├── destino_model.dart        # Destino (id, nombre, provincia, coord, clima, categoría, uid, nombreCreador, promedioCalificacion, totalCalificaciones, copyWith, factory create)
 │   ├── user.dart                 # AppUser (uid, nombre, email, avatarUrl)
-<<<<<<< HEAD
 │   ├── favorito_model.dart       # Favorito (no usado activamente)
 │   ├── visita_model.dart         # Visita (calificación 1-5, comentario, nombreUsuario)
 │   ├── sitio_osm.dart            # SitioOsm para resultados de Overpass API
 │   ├── categorias_destino.dart   # 24 categorías con keys y labels
-=======
-│   ├── favorito_model.dart       # Favorito (no usado activamente — migración futura)
-│   ├── visita_model.dart         # Visita (calificación 1-5, comentario)
-│   ├── sitio_osm.dart            # SitioOsm para resultados de Overpass API
-│   ├── categorias_destino.dart   # Mapas de categorías con labels e iconos
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
 │   └── provincias_ec.dart        # Lista constante de 24 provincias
 ├── providers/
 │   ├── session_provider.dart     # Estado de autenticación + updateProfile/updateAvatar + syncUserProfile
@@ -236,11 +199,10 @@ lib/
 │   ├── visita_provider.dart      # Visitas/calificaciones por destino (add, update, delete, checkUserVisited)
 │   └── destino_update_notifier.dart # Notificador ligero para recarga post-edit (versión counter)
 ├── screens/
-<<<<<<< HEAD
 │   ├── login_screen.dart         # Login/registro con icono app, toggle contraseña, validación
 │   ├── home_screen.dart          # Paginación 20 items, scroll infinito, búsqueda, categorías chips, filtros bottom sheet (categoría/provincia/rating), "Cerca de mí" + Overpass, chatbot, logout, observer ultimaModificacionDestinos y DestinoUpdateNotifier
 │   ├── favorites_screen.dart     # Favoritos + búsqueda insensible acentos + filtros categoría chips + estados empty/sin resultados + observer ultimaModificacionDestinos y DestinoUpdateNotifier
-│   ├── profile_screen.dart       # Avatar cámara/galería + botón logout en header, edit nombre, dashboard (donut chart: positivas/neutras/negativas, stats, mejor valorado, Explorador badge), mis destinos (DestinoCardEditable con edit/delete overlays), scroll fluido, refresh automático al cambiar favoritos/editar/eliminar
+│   ├── profile_screen.dart       # Avatar cámara/galería + botón logout en header, edit nombre, dashboard (bar chart: desglose 5★-1★ con barras de colores, stats, mejor valorado, Explorador badge), mis destinos (DestinoCardEditable con edit/delete overlays), scroll fluido, refresh automático al cambiar favoritos/editar/eliminar
 │   ├── chatbot_screen.dart       # Webview Botpress v3.6 embebido con JavaScript Bridge + MutationObserver
 │   ├── destino_detail_screen.dart# Mapa OSM interactivo, "Cómo llegar" (Google Maps/Waze/Copiar coord), reseñas con fechas relativas, edit/delete por dueño, fav inline, PopScope, recarga destino post-edit
 │   └── add_destino_screen.dart   # Modo edición, params pre-llenados desde OSM, Autocomplete provincia/categoría, auto-geocoding debounce 800ms, clima en tarjeta, image picker (web+móvil), campos manuales lat/lng
@@ -260,29 +222,6 @@ lib/
     ├── destino_card_editable.dart# Card con editar/eliminar overlays oscuros + imagen + fav + info + ClimaResumen
     ├── destino_osm_card.dart     # Card horizontal Overpass (tipo icono, nombre, distancia, botón "Agregar" → AddDestinoScreen)
     └── clima_resumen.dart        # Widget clima reusable (3 columnas: clima, temperatura, humedad)
-=======
-│   ├── login_screen.dart         # Login/registro con validación
-│   ├── home_screen.dart          # Lista de destinos + búsqueda + FAB + "Cerca de mí" + Overpass
-│   ├── favorites_screen.dart     # Favoritos + búsqueda + filtros categoría
-│   ├── profile_screen.dart       # Perfil con avatar editable, dashboard, edit nombre, logout
-│   ├── destino_detail_screen.dart# Detalle + reseñas minimalistas + AppBar editar/eliminar (dueño)
-│   └── add_destino_screen.dart   # Formulario con Autocomplete + auto-geocoding + params desde OSM
-├── services/
-│   ├── auth_service.dart         # Supabase Auth + users table (incluye avatar_url)
-│   ├── favorito_service.dart     # SharedPreferences persistencia
-│   ├── visita_service.dart       # Supabase visitas CRUD + agregaciones + resumen
-│   ├── storage_service.dart      # Supabase Storage (destinos + avatars bucket)
-│   ├── weather_service.dart      # OpenWeatherMap API
-│   ├── geocoding_service.dart    # Photon API (OSM)
-│   ├── gps_service.dart          # geolocator GPS
-│   ├── overpass_service.dart     # Overpass API (tourism en radio 5km)
-│   └── snackbar_service.dart     # Snackbars con mensajes amigables
-└── widgets/
-    ├── destino_card.dart         # Card resumen (corazón, clima, estrellas, distanciaKm opcional)
-    ├── destino_card_editable.dart# Card con editar/eliminar (overlays oscuros)
-    ├── destino_osm_card.dart     # Card horizontal para resultados Overpass (nombre, tipo, distancia, botón Agregar)
-    └── clima_resumen.dart        # Widget de clima reusable
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
 ```
 
 ---
@@ -341,16 +280,6 @@ lib/
 7. Cada card tiene botón "Agregar" → `AddDestinoScreen` con nombre y coordenadas pre-llenados + clima automático
 8. Estado persiste al cambiar de tabs (IndexedStack)
 
-### Cerca de mí (ordenar por distancia + Overpass)
-1. Usuario toca icono `my_location_rounded` en AppBar de HomeScreen
-2. Si ya activo (guard de 2s contra misclick): se desactiva, restaura orden original
-3. Si no activo: `GpsService.getCurrentLocation()` → obtiene posición GPS
-4. Destinos se ordenan por distancia ascendente (Haversine) y muestran badge "X.X km"
-5. `OverpassService` consulta lugares turísticos cercanos en OSM (radio 5km, caché 10s)
-6. Sección "También cerca de ti" aparece con cards horizontales
-7. Cada card tiene botón "Agregar" → `AddDestinoScreen` con nombre y coordenadas pre-llenados + clima automático
-8. Estado persiste al cambiar de tabs (IndexedStack)
-
 ### Avatar (foto de perfil)
 1. Usuario toca avatar en `ProfileScreen`
 2. Bottom sheet: cámara o galería → `ImagePicker.pickImage()` (max 1024x1024)
@@ -374,9 +303,9 @@ lib/
 
 ### ProfileScreen — Dashboard
 1. Al cargar perfil, `_cargarMisDestinos()` obtiene destinos del usuario + llama a `VisitaService.getResumenCalificacionesForDestinos()`
-2. Dashboard muestra: conteo de destinos y reseñas, gráfico donut (positivas ≥4★, neutras =3★, negativas ≤2★)
+2. Dashboard muestra: conteo de destinos y reseñas, gráfico de barras horizontales (desglose 5★ a 1★ con barras de colores y conteo), promedio general con estrella
 3. Badge "Explorador" si el usuario tiene ≥3 destinos
-4. Sección "Mejor valorado" con enlace al detalle
+4. Secciones de "Categorías" y "Provincias" con chips
 5. Caché de recarga: solo recarga si pasaron >3s desde la última carga
 
 ---
@@ -395,13 +324,9 @@ lib/
 - **IndexedStack en tabs:** MainTabsScreen usa `IndexedStack` en vez de switch simple para preservar el estado de cada pantalla (scroll, filtros, "Cerca de mí", resultados Overpass) al cambiar entre tabs.
 - **Haversine inline:** El cálculo de distancia entre coordenadas se implementa como función inline con `dart:math`, sin dependencias externas.
 - **Rate limit y guard de misclick:** Las consultas a Overpass tienen un caché mínimo de 10s. El toggle de "Cerca de mí" ignora taps si pasaron menos de 2s del último toggle.
-<<<<<<< HEAD
 - **Paginación con ScrollController:** HomeScreen carga 20 destinos por página con scroll infinito. Detecta `maxScrollExtent - 200` para gatillar carga. Incluye indicador de carga al final.
 - **Filtros BottomSheet con progresividad:** Los filtros de categoría y provincia muestran solo 6 opciones inicialmente con enlace "Ver más (N)". Incluye búsqueda en provincia. La calificación mínima usa estrellas interactivas.
 - **AppColors como paleta fija:** Sin colores generados por `fromSeed` que introducían tintes morados en dropdowns. Se forza `canvasColor`, `surfaceContainerHigh`, y `menuTheme` a blancos para coherencia visual. Paleta de 11 colores (sol, solOscuro, solClaro, tinta, musgo, musgoClaro, lienzo, lienzoAlterno, niebla, error, exito).
-=======
-- **AppColors como paleta fija:** Sin colores generados por `fromSeed` que introducían tintes morados en dropdowns. Se forza `canvasColor`, `surfaceContainerHigh`, y `menuTheme` a blancos para coherencia visual.
->>>>>>> b789efd7c25369bbf216b0ff925262a59deab2b1
 - **Diálogos consistentes:** Todos los botones de acción destructiva usan `AppColors.musgo` (gris) en vez de rojo. Cancelar hereda `AppColors.sol` del `TextButtonTheme`.
 - **Botones de reseña:** Cancelar como `OutlinedButton`, Publicar como `FilledButton` — ambos con el mismo tamaño (flex:1).
 - **SnackbarService centralizado:** Traduce excepciones técnicas (`AuthException`, `PostgrestException`, `SocketException`, etc.) a mensajes amigables en español, sin exponer detalles internos. Incluye detección específica para errores de avatar (`(upload)` y `(db)`), ubicación, clima, mapas, cámara/galería, y timeout.
@@ -412,7 +337,7 @@ lib/
 - **Fecha relativa en reseñas:** Las reseñas muestran "Hace X días/horas/minutos" en vez de fecha absoluta.
 - **Formulario contextual de reseña:** El título del formulario cambia entre "Comparte tu experiencia" (nueva) y "Editar tu reseña" (existente). El botón cambia entre "Publicar reseña" y "Actualizar reseña".
 - **PopScope en detalle:** `DestinoDetailScreen` usa `PopScope` (con `onPopInvokedWithResult`) para devolver `_dataModificada` a la pantalla anterior, permitiendo recarga condicional.
-- **Donut Chart en perfil:** Dashboard de perfil incluye gráfico donut personalizado con `CustomPainter` para mostrar proporción de reseñas positivas/neutras/negativas.
+- **Bar Chart en perfil:** Dashboard de perfil incluye gráfico de barras horizontales con barras de colores (verde, naranja, gris, rojo) mostrando desglose de reseñas de 5★ a 1★, junto con tarjeta de promedio general.
 - **Caché de recarga en perfil:** `ProfileScreen` solo recarga destinos si pasaron >3s desde la última carga, evitando ciclos infinitos con `context.watch`.
 - **Botpress con JavaScript Bridge:** El chatbot embebido usa `addJavaScriptChannel('BotpressBridge')` para escuchar eventos `ready` y `closed`. Un `MutationObserver` oculta el launcher flotante de Botpress. El script de configuración del bot se carga desde `files.bpcontent.cloud`.
 - **Uso de `withValues(alpha:)`:** En lugar de `withOpacity()` (obsoleto en Flutter 3.44+), se usa `withValues(alpha:)` para transparencias.
