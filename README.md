@@ -39,8 +39,10 @@
 
   <img width="22%" alt="login" src="https://github.com/user-attachments/assets/ea7b1a79-8faf-449a-833f-06fd9431e7e9" />
 
-  <img src="capturas/home.jpeg" width="22%" alt="Pantalla Principal" />
-  <img src="capturas/detail_lugar.jpeg" width="22%" alt="Detalle del Destino" />
+  <img width="22%" alt="home" src="https://github.com/user-attachments/assets/395eb5f8-80e7-431a-8095-146ab94bb9a4" />
+
+  <img width="22%" alt="detail_lugar" src="https://github.com/user-attachments/assets/0572bcce-a827-4790-a90e-c8e205e81190" />
+
 </div>
 <br>
 <div align="center">
