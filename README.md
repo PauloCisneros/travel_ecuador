@@ -31,7 +31,6 @@
 
 ## 📸 Características Principales y Capturas
 
-*Agrega aquí las capturas de la carpeta `capturas` para mostrar la interfaz de usuario.*
 
 <div align="center">
   <!-- Reemplaza con las rutas de tus capturas -->
