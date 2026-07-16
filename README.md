@@ -1,107 +1,184 @@
-# Travel Ecuador 🇪🇨
+<div align="center">
+  <img src="assets/icon/icon.png" alt="Travel Ecuador Logo" width="120">
 
-![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?logo=dart&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?logo=supabase&logoColor=white)
+  # Travel Ecuador 🇪🇨
+  **Descubre, Comparte y Explora la Belleza del Ecuador**
 
-**Travel Ecuador** es una aplicación móvil desarrollada en Flutter diseñada para descubrir, compartir y guardar destinos turísticos en Ecuador. Los usuarios pueden explorar lugares de interés, obtener datos climáticos en tiempo real, visualizar mapas interactivos, y participar en la comunidad calificando y dejando reseñas.
+  ![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+  ![Dart](https://img.shields.io/badge/Dart-3.12-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+  ![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+  ![Material Design 3](https://img.shields.io/badge/Material%203-UI-F6A5C0?style=for-the-badge&logo=material-design&logoColor=white)
+</div>
+
+<br>
+
+**Travel Ecuador** es una aplicación móvil nativa desarrollada con Flutter, diseñada con una arquitectura robusta y escalable. Su propósito es fomentar el turismo interno al permitir a los usuarios descubrir destinos, obtener métricas climatológicas precisas en tiempo real, visualizar mapas y participar en una comunidad impulsada por reseñas y geolocalización.
 
 ---
 
-## 🌟 Características Principales
+## 📑 Tabla de Contenidos
 
-### 🚀 Exploración y Autenticación
-Descubre destinos ecuatorianos y crea tu perfil personalizado.
-
-<div align="center">
-  <img src="capturas/splash_screem.jpeg" width="200" alt="Splash Screen" />
-  <img src="capturas/login.jpeg" width="200" alt="Login" />
-  <img src="capturas/home.jpeg" width="200" alt="Home" />
-</div>
-
-### 🔍 Filtros y Favoritos
-Encuentra exactamente lo que buscas filtrando por categoría, provincia o calificación, y guarda tus destinos favoritos.
-
-<div align="center">
-  <img src="capturas/filtros.jpeg" width="200" alt="Filtros" />
-  <img src="capturas/favoritos.jpeg" width="200" alt="Favoritos" />
-</div>
-
-### 📍 Ubicación y Clima en Tiempo Real
-La aplicación utiliza el GPS de tu dispositivo para encontrar lugares "Cerca de mí" y muestra el clima actual del destino seleccionado.
-
-<div align="center">
-  <img src="capturas/modo_cerca_de_mi.jpeg" width="200" alt="Modo cerca de mí" />
-  <img src="capturas/detail_lugar.jpeg" width="200" alt="Detalle del Lugar" />
-</div>
-
-### ✏️ Gestión de Destinos y Perfil
-Añade nuevos lugares a la plataforma, edita tus contribuciones y gestiona tu perfil con un panel de estadísticas de tus interacciones y reseñas.
-
-<div align="center">
-  <img src="capturas/form_añadir_lugar.jpeg" width="200" alt="Añadir Lugar" />
-  <img src="capturas/editarform_lugar.jpeg" width="200" alt="Editar Lugar" />
-  <img src="capturas/perfil.jpeg" width="200" alt="Perfil" />
-</div>
-
-### 🤖 EcuGuía: Asistente Turístico
-Interactúa con nuestro chatbot inteligente integrado (impulsado por Botpress) para obtener recomendaciones y asistencia sobre turismo local.
-
-<div align="center">
-  <img src="capturas/chatbot.jpeg" width="200" alt="Chatbot" />
-</div>
+- [Características Principales](#-características-principales-y-capturas)
+- [Arquitectura del Sistema](#-arquitectura-del-sistema)
+- [Gestión del Estado y Flujo de Datos](#-gestión-del-estado-y-flujo-de-datos)
+- [Integraciones y APIs](#-integraciones-y-apis)
+- [Estructura del Proyecto](#-estructura-del-proyecto)
+- [Decisiones de Diseño y UI/UX](#-decisiones-de-diseño-y-uiux)
+- [Instalación y Configuración](#-instalación-y-configuración)
+- [Roadmap](#-roadmap)
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 📸 Características Principales y Capturas
 
-- **UI Framework:** Flutter (Material 3)
-- **Gestión de Estado:** `provider` + ChangeNotifier
-- **Backend & Autenticación:** Supabase (Auth, Postgres DB, Storage)
-- **Mapas y Geocodificación:** `flutter_map` (OpenStreetMap), `url_launcher`, Photon API
-- **Clima:** OpenWeatherMap API
-- **Búsqueda de POI:** Overpass API (OpenStreetMap)
-- **Geolocalización:** `geolocator`
-- **Asistente Virtual:** `webview_flutter` con Botpress embebido
+*Agrega aquí las capturas de la carpeta `capturas` para mostrar la interfaz de usuario.*
 
-## 📐 Arquitectura
+<div align="center">
+  <!-- Reemplaza con las rutas de tus capturas -->
+  <img src="capturas/splash_screem.jpeg" width="22%" alt="Splash Screen" />
+  <img src="capturas/login.jpeg" width="22%" alt="Autenticación" />
+  <img src="capturas/home.jpeg" width="22%" alt="Pantalla Principal" />
+  <img src="capturas/detail_lugar.jpeg" width="22%" alt="Detalle del Destino" />
+</div>
+<br>
+<div align="center">
+  <img src="capturas/filtros.jpeg" width="22%" alt="Filtros" />
+  <img src="capturas/modo_cerca_de_mi.jpeg" width="22%" alt="Cerca de mí" />
+  <img src="capturas/perfil.jpeg" width="22%" alt="Perfil de Usuario" />
+  <img src="capturas/chatbot.jpeg" width="22%" alt="Asistente Virtual" />
+</div>
 
-La aplicación sigue el patrón **Service - Provider - Screen**:
+### ✨ Funcionalidades Core
+- **Autenticación Segura:** Sistema de login/registro gestionado a través de Supabase Auth con perfiles persistentes.
+- **Geolocalización Inversa y Directa:** Integración de OpenStreetMap y Komoot Photon para la creación de destinos con autocompletado y auto-geocoding con `debounce`.
+- **Clima en Tiempo Real:** Consumo de la API de OpenWeatherMap inyectada dinámicamente según la lat/lng del lugar.
+- **Exploración Contextual:** Modo "Cerca de mí" que cruza el GPS del dispositivo con la API Overpass (OSM) para sugerir POIs (Puntos de Interés) turísticos reales a 5km a la redonda.
+- **Asistente Virtual:** `EcuGuía`, un chatbot integrado mediante webview con puente JS (Botpress), orientado a asistencia turística.
+- **Paginación Dinámica:** Scroll infinito controlado (`ScrollController`) que carga lotes de 20 destinos optimizando el uso de memoria.
 
-1. **Pantallas (UI):** Se suscriben a los Providers usando `context.watch()` o `context.read()` para renderizar la interfaz.
-2. **Providers:** Manejan el estado de la aplicación de manera global (`SessionProvider`, `FavoritoProvider`, `VisitaProvider`, `DestinoUpdateNotifier`) y notifican a la UI de los cambios en tiempo real.
-3. **Servicios:** Clases que encapsulan la lógica de negocio pura y las llamadas a dependencias externas (Supabase, API de Clima, Photon, OSM, GPS, etc.).
+---
 
-## 🚀 Empezando (Getting Started)
+## 🏗 Arquitectura del Sistema
 
-### Requisitos Previos
-- Flutter SDK `^3.12.1`
+El proyecto implementa el patrón arquitectónico **Service - Provider - Screen**, asegurando una estricta separación de responsabilidades, alta testabilidad y escalabilidad.
 
-### Instalación
+```mermaid
+graph TD
+    UI[Pantallas UI / Widgets] -->|watch / read| PR(Providers - ChangeNotifier)
+    PR -->|instancia / inyecta| SV(Servicios de Negocio)
+    SV -->|REST / RPC| BE[(Supabase / APIs Externas)]
+    BE -->|Data / JSON| SV
+    SV -->|Modelos Dart| PR
+    PR -->|notifyListeners| UI
+```
 
-1. Clona el repositorio
-2. Instala las dependencias:
+- **Servicios (`/services`):** Clases Dart puras, agnósticas a la UI. Manejan la lógica de negocio, manejo de excepciones de red, y llamadas a base de datos o APIs REST.
+- **Providers (`/providers`):** Gestionan el estado reactivo. Registrados globalmente en el `MultiProvider`. No contienen lógica de negocio compleja, actúan como intermediarios (View-Models).
+- **Pantallas (`/screens`):** Estrictamente declarativas. Reaccionan a los cambios de estado y delegan las acciones del usuario a los providers.
+
+---
+
+## 🧠 Gestión del Estado y Flujo de Datos
+
+Se eligió **Provider** (`ChangeNotifier`) por ser una solución pragmática y madura en el ecosistema Flutter. 
+
+### Patrones Destacados:
+1. **Manejo Eficiente de Caché:** `VisitaService._actualizarCache()` actualiza el promedio de calificaciones directamente en la tabla `destinos` de Postgres, evitando costosos `JOINs` al cargar listas grandes.
+2. **Cross-Screen Refreshing:** Para evitar bucles infinitos (`setState` o `watch` cruzados), se implementó un notificador ligero de control de versiones (`DestinoUpdateNotifier`). Cuando se edita o elimina un destino, este notificador actualiza su versión, invalidando caché selectivamente en el `HomeScreen` y `FavoritesScreen`.
+3. **Preservación de Estado de Navegación:** El enrutamiento principal utiliza un `IndexedStack` dentro del `MainTabsScreen`. Esto asegura que los filtros activos, el estado del scroll y el modo "Cerca de Mí" no se pierdan al cambiar de pestañas.
+
+---
+
+## 🔌 Integraciones y APIs
+
+El ecosistema de la app se alimenta de múltiples fuentes de datos:
+
+| Servicio/API | Función Técnica | Implementación / Detalles |
+|---|---|---|
+| **Supabase** | Backend as a Service | `Auth`, `Postgres` (CRUD con RLS policies) y `Storage` (Buckets separados para avatars e imágenes de destinos). |
+| **OpenWeatherMap** | Meteorología | Consultas REST paramétricas (métrico, lang=es). Implementa timeout riguroso de 15s. |
+| **Photon (OSM)** | Geocodificación | Traducción Nombre -> Lat/Lng. Estrategia de fallback dinámico si falla la región principal. |
+| **Overpass API** | Búsqueda Geoespacial | Queries QL para nodos de tipo `tourism` en radio `haversine` de 5km desde la posición del dispositivo. |
+| **Botpress** | NLU / Chatbot | Embebido vía `webview_flutter` utilizando un canal asíncrono JavaScript (Bridge) para escuchar eventos del DOM. |
+
+---
+
+## 📁 Estructura del Proyecto
+
+El código fuente en `lib/` está organizado por capas lógicas (Feature-by-Layer):
+
+```text
+lib/
+├── models/             # DTOs y Modelos de Dominio con factorías (fromJson/toJson).
+├── providers/          # ChangeNotifiers (Session, Visitas, Favoritos, UpdateNotifier).
+├── screens/            # UI Controllers.
+│   ├── auth/           # (Lógica de autenticación y Gatekeepers).
+│   └── dashboard/      # (Gráficos FlChart, estadísticas).
+├── services/           # Lógica Core e infraestructura.
+│   ├── api/            # Wrappers de OWM, Photon, Overpass.
+│   ├── core/           # AuthService, GpsService.
+│   └── database/       # Supabase CRUDs.
+├── theme/              # AppTheme, Material 3, Sistema de Tokens (AppColors).
+├── utils/              # Math utilities, Haversine distances, Caching strategies.
+└── widgets/            # Componentes granulares (DestinoCard, ResumenClima).
+```
+
+---
+
+## 🎨 Decisiones de Diseño y UI/UX
+
+Actuando bajo estrictas guías de diseño moderno y rendimiento:
+
+1. **Material Design 3:** Implementación completa de MD3. Las tarjetas, chips, y modales (`BottomSheet`) respetan las elevaciones y tipografías nativas.
+2. **Paleta de Colores Inmutable (`AppColors`):** Se descartó la generación dinámica vía `ColorScheme.fromSeed` en favor de tokens de color estrictos, garantizando accesibilidad y coherencia (sin tintes morados accidentales).
+3. **Manejo Centralizado de Errores:** Se desarrolló un `SnackbarService` que atrapa `AuthException`, `PostgrestException`, y timeouts, traduciéndolos a mensajes amigables para el usuario (User-facing errors).
+4. **Debouncing en Búsquedas:** Los campos predictivos (Auto-Geocoding) implementan un *debounce* de 800ms. Esto evita saturar las APIs de Photon/OWM mientras el usuario tipea.
+5. **Animaciones Nativas:** La pantalla de carga (`splash_screen`) utiliza el `TickerProviderStateMixin` para secuencias animadas (Scale, Fade, Slide) a 60fps constantes.
+
+---
+
+## ⚙️ Instalación y Configuración
+
+Sigue estos pasos para compilar el proyecto en un entorno local.
+
+### Prerrequisitos
+- Flutter SDK `^3.12.1` o superior.
+- Dispositivo físico o Emulador Android/iOS.
+- (Opcional) Instancia propia de Supabase y API Key de OWM si deseas migrar el backend.
+
+### Pasos de compilación
+
+1. **Clonar el repositorio:**
+   ```bash
+   git clone https://github.com/tu-usuario/travel_ecuador.git
+   cd travel_ecuador
+   ```
+
+2. **Instalar dependencias de Dart:**
    ```bash
    flutter pub get
    ```
-3. Ejecuta la aplicación:
+
+3. **Análisis de código (Linter):**
+   Asegúrate de que la arquitectura cumpla con las reglas:
+   ```bash
+   flutter analyze
+   ```
+
+4. **Ejecutar en modo Debug:**
    ```bash
    flutter run
    ```
 
-*(Nota: La aplicación contiene las credenciales de conexión de desarrollo y APIs. Para un ambiente de producción, se recomienda reemplazarlas por llaves propias).*
+*(Recomendación Senior: Para compilar un release optimizado en Android, utiliza `flutter build apk --split-per-abi --obfuscate --split-debug-info=./debug_info`)*.
 
-## 📂 Estructura del Proyecto
+---
 
-```text
-lib/
-├── main.dart             # Punto de entrada y MultiProvider
-├── splash_screen.dart    # Pantalla de carga con animación custom
-├── models/               # Modelos de datos (Destino, User, Visita, Categorías, Provincias)
-├── providers/            # Notificadores de estado (Auth, Favoritos, Visitas)
-├── screens/              # Vistas principales (Home, Auth, Profile, Detail, etc.)
-├── services/             # Conexiones externas (Supabase, Weather, Gps, Geocoding)
-├── theme/                # Configuración de tema global (Material 3 y Paleta de colores)
-├── utils/                # Funciones utilitarias (Cálculo Haversine para distancias, Caché)
-└── widgets/              # Componentes reutilizables (Cards, Resumen de Clima)
-```
+## 🚀 Roadmap (Próximas Mejoras)
+- [ ] **Soporte Offline-First:** Implementar `Isar` o `Hive` Database para almacenar en caché destinos visitados y soportar exploración sin red.
+- [ ] **Migración a Riverpod:** Refactorización gradual del árbol de dependencias para usar `Riverpod` o `Bloc` de cara a un mayor volumen de estado inmutable.
+- [ ] **Animaciones Hero Mejoradas:** Transiciones más complejas entre `DestinoCard` y el `DestinoDetailScreen`.
+- [ ] **Testing:** Implementación de Integration Tests (`integration_test`) automatizados para el flujo crítico (Login -> Explorar -> Calificar).
+
+---
+*Desarrollado con ❤️ y Flutter.*
